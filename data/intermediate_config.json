@@ -1,0 +1,374 @@
+{
+  "Sheets": [
+    {
+      "Name": "Supply_Parameters",
+      "NameExpression": "(?i)(supply).*?(parameter[s]?)",
+      "Variable": "Supply_Parameters",
+      "Errors": [],
+      "Data": "",
+      "Columns": [
+        {
+          "Name": "Region",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "str",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "PLANT",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "str",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Plant Code",
+          "AlternateNames": [
+            "Plant"
+          ],
+          "NameExpression": "",
+          "DataExpression": "^[A-Z][0-9]+$",
+          "CustomExpressionError": "Value must match PlantCode format. Example A350",
+          "DataType": "str",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Material Code",
+          "AlternateNames": [
+            "RM Code"
+          ],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "int",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Material Desc",
+          "AlternateNames": [
+            "RM DESCRIPTION",
+            "RM Name"
+          ],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "str",
+          "Required": false,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Supplier Code",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "int",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Supplier Name",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "str",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "SOB",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "float",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "INCO Term",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "str",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Category",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "str",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "RM Type",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "(?i)^(Imported|Local\\s?\\(Imported\\)|Local)$",
+          "CustomExpressionError": "Value must be either Local, Local (Imported) or Imported",
+          "DataType": "str",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "RM Class Group",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "str",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Source Country",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "str",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Source Region",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "str",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "MINIMUM ORDER QTY (Units)",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "float",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Supply Reliability (%)",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "float",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Information Cycle (Days)",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "int",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Service Level (%)",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "float",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        }
+      ]
+    },
+    {
+      "Name": "Sourcing_Data",
+      "NameExpression": "(?i)(sourcing).*?(data)",
+      "Variable": "Sourcing_Data",
+      "Errors": [],
+      "Data": "",
+      "Columns": [
+        {
+          "Name": "Country",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "str",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Additional Time (Days)",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "int",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Plant Code",
+          "AlternateNames": [
+            "Plant"
+          ],
+          "NameExpression": "",
+          "DataExpression": "(?i)^[A-Z][0-9]+$",
+          "CustomExpressionError": "Value must match PlantCode format. Example A350",
+          "DataType": "str",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "RM Code",
+          "AlternateNames": [
+            "Material Code"
+          ],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "int",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "RM Name",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "str",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Supplier Code",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "int",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Supplier name",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "str",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Country of Origin",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "str",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Transit Time (Days)",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "int",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Transit Time Std. Dev. (%)",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "float",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Shipping Interval (Days)",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "int",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Shipping Interval Std. Dev. (%)",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "float",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        },
+        {
+          "Name": "Shipping Lot Size (Units)",
+          "AlternateNames": [],
+          "NameExpression": "",
+          "DataExpression": "",
+          "CustomExpressionError": "",
+          "DataType": "float",
+          "Required": true,
+          "RepeatNumber": 0,
+          "Errors": []
+        }
+      ]
+    }
+  ]
+}
