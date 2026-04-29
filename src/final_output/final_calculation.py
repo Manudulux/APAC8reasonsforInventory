@@ -15,7 +15,7 @@ class FinalCalculation:
         #------------------------------------Calculate-Final-----------------------------------#
         #--------------------------------------------------------------------------------------#
         # CALCULATE THE SERVICE_LEVEL_FACTOR.
-        self.Supply_Parameters['Service Level (%)'].fillna(0, inplace=True)
+        self.Supply_Parameters['Service Level (%)'] = self.Supply_Parameters['Service Level (%)'].fillna(0)
         service_level_factor_df = self.Supply_Parameters.groupby(['Plant Code','Material Code', 'Supplier Code']).apply(
             lambda x: norm.ppf(x['Service Level (%)'].astype(float).iloc[0] / 100)  # Removed axis, fixed percentage
         ).reset_index(name='Service Level Factor (z)')

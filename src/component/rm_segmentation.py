@@ -65,24 +65,24 @@ class RmSegmentation:
 
     def cummulative_contribution(self):
         future_forecast = self.year_req_val()
+        # Restore Plant Code from RM_Plant if it was dropped by any groupby operation
+        if 'Plant Code' not in future_forecast.columns and 'RM_Plant' in future_forecast.columns:
+            future_forecast['Plant Code'] = future_forecast['RM_Plant'].str.split('_').str[1]
+
         total_y23_per_plant = future_forecast.groupby('Plant Code')['Year Req Val'].sum()
 
-        def calculate_contribution(group):
-            total = total_y23_per_plant[group.name]
-            if total == 0:
-                group = group.copy()
-                group["Contribution"] = 0.0
-            else:
-                group = group.copy()
-                group["Contribution"] = (group["Year Req Val"].cumsum() / total * 100).round(2)
-            return group
+        # Avoid groupby.apply (drops grouping column in pandas >= 2.2).
+        # Instead compute cumsum per plant using a merge.
+        future_forecast = future_forecast.sort_values(
+            ['Plant Code', 'Year Req Val'], ascending=[True, False]
+        ).reset_index(drop=True)
 
-        future_forecast = (
-            future_forecast
-            .groupby('Plant Code', group_keys=False)
-            .apply(calculate_contribution)
-            .reset_index(drop=True)
-        )
+        future_forecast['_cumsum'] = future_forecast.groupby('Plant Code')['Year Req Val'].cumsum()
+        future_forecast['_total']  = future_forecast['Plant Code'].map(total_y23_per_plant)
+        future_forecast['Contribution'] = (
+            future_forecast['_cumsum'] / future_forecast['_total'].replace(0, pd.NA) * 100
+        ).fillna(0).round(2)
+        future_forecast.drop(columns=['_cumsum', '_total'], inplace=True)
         return future_forecast
 
     def determine_rm_segment(self, contribution):

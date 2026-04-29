@@ -89,8 +89,9 @@ class EightReasons:
             dataframes['Consumption_merged'] = final_df
             return dataframes
         except Exception as e:
-             return e
-    
+            import traceback; traceback.print_exc()
+            raise RuntimeError(f"generate_final_consumption failed: {e}") from e
+
     def generate_final_rm_segmentation(self, dataframes):
         try:
             supply_parameter = dataframes["Supply_Parameters"]
@@ -121,8 +122,9 @@ class EightReasons:
             dataframes['RM_Seg_merged'] = rm_seg_final_df
             return dataframes
         except Exception as e:
-             return e
-        
+            import traceback; traceback.print_exc()
+            raise RuntimeError(f"generate_final_rm_segmentation failed: {e}") from e
+
     def calculate_data_quality(self, df, exclude_columns):
         """
         Calculate data quality score for each row based on missing or zero values.
@@ -351,7 +353,7 @@ class EightReasons:
             # Adding RM Type as Category Column
             final_output_df.drop(columns=['Category'], inplace=True)
             final_output_df.rename(columns={'RM Type' : 'Category'}, inplace=True)
-            final_output_df[final_output_df.select_dtypes(include=['object']).columns] = final_output_df.select_dtypes(include=['object']).applymap(lambda x: x.strip() if isinstance(x, str) else x)
+            final_output_df[final_output_df.select_dtypes(include=['object']).columns] = final_output_df.select_dtypes(include=['object']).map(lambda x: x.strip() if isinstance(x, str) else x)
 
             self.final_response['Consumption_merged'] = convert_df_to_base64(self.dataframes['Consumption_merged'])
             self.final_response['RM_Seg_merged'] = convert_df_to_base64(self.dataframes['RM_Seg_merged'])
