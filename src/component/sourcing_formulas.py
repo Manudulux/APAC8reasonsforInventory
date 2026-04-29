@@ -86,7 +86,7 @@ class SourcingCalculations:
                 how='left')
             post_week_diff = self.utils_class.calculate_post_week_diff(shipping_interval_df['Post Week'].tolist())
             modified_sourcing_df['Shipping Interval (Days)'] = modified_sourcing_df['Post Week'].apply(lambda x: round((7 * post_week_diff)/(self.utils_class.calculating_post_week_sum(x)), 4) if isinstance(x, list) else np.nan)
-            dataframes["Sourcing_Data"] = modified_sourcing_df.drop(columns=['Supplier'], axis=1)
+            dataframes["Sourcing_Data"] = modified_sourcing_df.drop(columns=['Supplier'])
             return dataframes
         except Exception as e:
             raise e
@@ -119,7 +119,7 @@ class SourcingCalculations:
                                                 )
             merged_df['Shipping Lot Size (Units)'] = merged_df['Shipping Lot Size']
             merged_df.drop(columns=['Shipping Lot Size'], inplace=True)
-            merged_df['Shipping Lot Size (Units)'].fillna(0, inplace=True)
+            merged_df['Shipping Lot Size (Units)'] = merged_df['Shipping Lot Size (Units)'].fillna(0)
             dataframes["Sourcing_Data"] = merged_df
             return dataframes
         except Exception as e:

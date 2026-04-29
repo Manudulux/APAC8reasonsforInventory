@@ -51,7 +51,7 @@ class SupplyParameter:
 
             # Delete the Shipping_Interval columns from Supply_Parameters df
             updated_supply_params.drop(columns=['Movement Qty', 'RM Code', 'Supplier'], inplace=True)
-            updated_supply_params['MINIMUM ORDER QTY (Units)'].fillna(0, inplace=True)
+            updated_supply_params['MINIMUM ORDER QTY (Units)'] = updated_supply_params['MINIMUM ORDER QTY (Units)'].fillna(0)
             # Update the class attribute
             self.df["Supply_Parameters"] = updated_supply_params
             return self.df
