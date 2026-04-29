@@ -105,6 +105,9 @@ with st.sidebar:
         "⚙️ Intermediate File",
         "📊 Final Output",
         "🔧 Global Settings",
+        "📊 Dashboard 1",
+        "🗺️ Dashboard 2",
+        "📈 Dashboard 3",
     ])
     st.markdown("---")
     st.markdown("**Pipeline status**")
@@ -519,3 +522,491 @@ elif page == "🔧 Global Settings":
 
     with st.expander("📋 Current configuration (raw JSON)"):
         st.json(gp_class.get_global_config())
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DASHBOARD 1  ── RM Segmentation Overview (cards + consumption chart)
+# ══════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
+# DASHBOARD 1 — RM Segmentation Overview (matching original UI)
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "📊 Dashboard 1":
+    import plotly.graph_objects as go
+
+    st.markdown("""
+    <style>
+    .gy-title {font-size:26px;font-weight:700;color:#1a1a2e;text-align:center;margin-bottom:4px}
+    .kpi-card {background:#f8f9fa;border:1px solid #dee2e6;border-radius:10px;padding:16px 12px;text-align:center}
+    .kpi-label {font-size:12px;color:#6c757d;font-weight:500}
+    .kpi-value {font-size:22px;font-weight:800;color:#1a1a2e;margin:4px 0}
+    .kpi-sub   {font-size:11px;color:#adb5bd}
+    .seg-card  {border-radius:10px;padding:10px 12px;margin-bottom:6px;min-height:165px;position:relative}
+    .seg-title {font-size:16px;font-weight:700;color:#1a1a2e}
+    .seg-line  {font-size:11px;color:#333;margin:1px 0}
+    .filter-row{background:#eef2ff;border-radius:8px;padding:10px 16px;margin-bottom:12px}
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<div class='gy-title'>8 Reasons of Inventory</div>", unsafe_allow_html=True)
+
+    if not st.session_state.get("final_output_b64"):
+        st.warning("⚠️ Please complete the **Final Output** step first.")
+        st.stop()
+
+    fo_bytes = b64_to_bytes(st.session_state["final_output_b64"])
+    sku_df   = pd.read_excel(BytesIO(fo_bytes), sheet_name="SKU Level")
+    cons_b64 = st.session_state.get("consumption_merged_b64", "")
+    cons_df  = pd.read_excel(BytesIO(b64_to_bytes(cons_b64))) if cons_b64 else pd.DataFrame()
+
+    def opts(col): return ["All"] + sorted(sku_df[col].dropna().unique().astype(str).tolist())
+
+    # ── Filters ────────────────────────────────────────────────────────────
+    with st.container():
+        st.markdown("<div class='filter-row'>", unsafe_allow_html=True)
+        fc = st.columns(5)
+        f_country = fc[0].selectbox("Country",           opts("Region"),         key="d1_country")
+        f_rm_desc = fc[1].selectbox("Raw Material Desc", ["All"] + sorted(sku_df["Material Desc"].dropna().unique().astype(str).tolist()), key="d1_rm")
+        f_rm_seg  = fc[2].selectbox("RM Segmentation",   opts("RM Segmentation"), key="d1_seg")
+        f_inco    = fc[3].selectbox("INCO Term",          opts("INCO Term"),       key="d1_inco")
+        f_plan    = fc[4].selectbox("Planning Cycle",     opts("Planning cycle"),  key="d1_plan")
+        fc2 = st.columns([1,1,1,1,0.5])
+        f_plant   = fc2[0].selectbox("Plant Name",        opts("PLANT"),           key="d1_plant")
+        f_cat     = fc2[1].selectbox("Category",          opts("Category"),        key="d1_cat")
+        f_src     = fc2[2].selectbox("Source Country",    opts("Source Country"),  key="d1_src")
+        f_rmcg    = fc2[3].selectbox("RM Class Group",    opts("RM Class Group"),  key="d1_rmcg")
+        search    = fc2[4].button("🔍 Search", key="d1_search", use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    fdf = sku_df.copy()
+    if f_country != "All": fdf = fdf[fdf["Region"]         == f_country]
+    if f_rm_seg  != "All": fdf = fdf[fdf["RM Segmentation"]== f_rm_seg]
+    if f_inco    != "All": fdf = fdf[fdf["INCO Term"]       == f_inco]
+    if f_plan    != "All": fdf = fdf[fdf["Planning cycle"]  == f_plan]
+    if f_plant   != "All": fdf = fdf[fdf["PLANT"]           == f_plant]
+    if f_cat     != "All": fdf = fdf[fdf["Category"]        == f_cat]
+    if f_src     != "All": fdf = fdf[fdf["Source Country"]  == f_src]
+    if f_rmcg    != "All": fdf = fdf[fdf["RM Class Group"]  == f_rmcg]
+    if f_rm_desc != "All": fdf = fdf[fdf["Material Desc"]   == f_rm_desc]
+
+    n_total   = len(fdf)
+    avg_dsi   = round(fdf["8 Reasons (DSI)"].mean(), 1) if n_total else 0
+    tot_units = fdf["8 Reasons (Units)"].sum()
+    map_avg   = fdf["MAP"].mean() if n_total else 0
+    tot_val   = round(tot_units * map_avg / 1e6, 2) if n_total else 0
+    tot_tons  = round(tot_units / 1000, 1) if n_total else 0
+
+    # ── KPI + Chart row ────────────────────────────────────────────────────
+    left_col, right_col = st.columns([1.1, 1])
+
+    with left_col:
+        st.markdown("#### 🎯 Targets")
+        k1, k2, k3 = st.columns(3)
+        def kpi_card(col, title, sub1, value, sub2):
+            col.markdown(f"""
+            <div class="kpi-card">
+                <div class="kpi-label">{title}</div>
+                <div class="kpi-sub">—</div>
+                <div class="kpi-label">{sub1}</div>
+                <div class="kpi-value">{value}</div>
+                <div class="kpi-label">{sub2}</div>
+                <div class="kpi-sub">—</div>
+            </div>""", unsafe_allow_html=True)
+
+        kpi_card(k1, "Plant AOP DSI (days)",         "8 Reasons Inventory DSI",      f"{avg_dsi} days", "Target (%)")
+        kpi_card(k2, "Plant AOP Value (million $)",   "8 Reasons Inventory Value",    f"${tot_val} M",   "Value (%)")
+        kpi_card(k3, "Plant AOP Tonnage (MT)",        "8 Reasons Inventory Tonnage",  f"{tot_tons:,.1f} MT", "Tonnage (%)")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # ── RM Segmentation grid (3×3) ─────────────────────────────────────
+        SEG_COLORS = {
+            "A1": "#a5d6a7", "A2": "#c8e6c9", "A3": "#e8f5e9",
+            "B1": "#b3e5fc", "B2": "#e1f5fe", "B3": "#f0f9ff",
+            "C1": "#e1bee7", "C2": "#f3e5f5", "C3": "#fce4ec",
+        }
+        segs = ["A1","A2","A3","B1","B2","B3","C1","C2","C3"]
+        cols3 = st.columns(3)
+        for i, seg in enumerate(segs):
+            sub = fdf[fdf["RM Segmentation"] == seg]
+            n   = len(sub)
+            pct = round(n / n_total * 100, 1) if n_total else 0
+            tot_qty  = round(sub["8 Reasons (Units)"].sum() / 1000, 1)
+            tot_inv  = round(sub["8 Reasons (Units)"].sum() * sub["MAP"].mean() / 1e6, 2) if n else 0
+            tot_sp   = round(sub["8 Reasons (Units)"].sum() * sub["MAP"].mean() / 1e6 / 1000, 3) if n else 0
+            svc      = round(sub["Service Level (%)"].mean(), 0) if n else 0
+            var      = round(sub["R8 Demand Variation (DSI)"].mean(), 1) if n else 0
+            bg       = SEG_COLORS.get(seg, "#f5f5f5")
+            with cols3[i % 3]:
+                st.markdown(f"""
+                <div class="seg-card" style="background:{bg}">
+                    <div class="seg-title">{seg}
+                        <span style="float:right;font-size:11px;color:#555">⬆ ⬇</span>
+                    </div>
+                    <div class="seg-line"># of items: <b>{n}/{n_total}</b> ({pct}%)</div>
+                    <div class="seg-line">Total req qty: <b>{tot_qty:,.1f}MT</b></div>
+                    <div class="seg-line">Total inv: <b>{tot_inv:.2f}M$</b></div>
+                    <div class="seg-line">Total spend: <b>{tot_sp:.3f}M$</b></div>
+                    <div class="seg-line">Service level: <b>{svc:.0f}%</b></div>
+                    <div class="seg-line">Average variability: <b>{var:.1f}</b></div>
+                </div>""", unsafe_allow_html=True)
+
+    # ── Right column: 12M Consumption chart ────────────────────────────────
+    with right_col:
+        st.markdown("#### 📅 Last 12M Consumption")
+        chart_type = st.selectbox("", ["Bar", "Line"], key="d1_ctype", label_visibility="collapsed")
+
+        if not cons_df.empty and "Post Date" in cons_df.columns:
+            c_filt = cons_df.copy()
+            if f_plant != "All" and "Plant Name" in c_filt.columns:
+                c_filt = c_filt[c_filt["Plant Name"] == f_plant]
+            c_filt["Post Date"] = pd.to_datetime(c_filt["Post Date"], dayfirst=True, errors="coerce")
+            c_filt["Month"]     = c_filt["Post Date"].dt.to_period("M")
+            monthly = (c_filt.groupby("Month")["Movement Qty"]
+                       .sum().abs().reset_index()
+                       .sort_values("Month").tail(12))
+            monthly["MonthStr"] = monthly["Month"].dt.strftime("%b %Y").str.upper()
+
+            if chart_type == "Bar":
+                fig_c = go.Figure(go.Bar(
+                    x=monthly["MonthStr"], y=monthly["Movement Qty"],
+                    marker_color="#1e3a7b",
+                    text=monthly["Movement Qty"].apply(lambda v: f"{v/1000:.0f}K"),
+                    textposition="inside", textfont=dict(color="gold", size=9)
+                ))
+            else:
+                fig_c = go.Figure(go.Scatter(
+                    x=monthly["MonthStr"], y=monthly["Movement Qty"],
+                    mode="lines+markers+text",
+                    line=dict(color="#1e3a7b", width=2),
+                    marker=dict(size=6, color="#1e3a7b"),
+                    text=monthly["Movement Qty"].apply(lambda v: f"{v/1000:.0f}K"),
+                    textposition="top center", textfont=dict(size=9)
+                ))
+            fig_c.update_layout(
+                margin=dict(l=10,r=10,t=10,b=30), height=280,
+                plot_bgcolor="white", paper_bgcolor="white",
+                yaxis=dict(autorange="reversed", gridcolor="#e9ecef", title="Qty (MT)"),
+                xaxis=dict(tickfont=dict(size=8), tickangle=-30),
+                legend=dict(orientation="h")
+            )
+            fig_c.add_annotation(
+                xref="paper", yref="paper", x=0, y=1.05,
+                text="Consumption Qty (MT)", showarrow=False,
+                font=dict(size=10, color="#1e3a7b"), bgcolor="#1e3a7b",
+                fontcolor="white", borderpad=4
+            )
+            st.plotly_chart(fig_c, use_container_width=True)
+        else:
+            st.info("Consumption data not available.")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DASHBOARD 2 — Region / Plant DSI + Supply Source Maps
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "🗺️ Dashboard 2":
+    import plotly.graph_objects as go
+
+    st.markdown("""
+    <style>
+    .d2-title {font-size:26px;font-weight:700;color:#1a1a2e;text-align:center;margin-bottom:8px}
+    .chart-box {background:white;border:1px solid #dee2e6;border-radius:10px;padding:12px}
+    </style>""", unsafe_allow_html=True)
+    st.markdown("<div class='d2-title'>8 Reasons of Inventory</div>", unsafe_allow_html=True)
+
+    if not st.session_state.get("final_output_b64"):
+        st.warning("⚠️ Please complete the **Final Output** step first.")
+        st.stop()
+
+    fo_bytes = b64_to_bytes(st.session_state["final_output_b64"])
+    sku_df   = pd.read_excel(BytesIO(fo_bytes), sheet_name="SKU Level")
+
+    def opts2(col): return ["All"] + sorted(sku_df[col].dropna().unique().astype(str).tolist())
+
+    # ── Filters ────────────────────────────────────────────────────────────
+    with st.container():
+        fc = st.columns([1,1,1,1,1,1,0.6])
+        f2_country = fc[0].selectbox("Country",        opts2("Region"),        key="d2_country")
+        f2_rm_seg  = fc[1].selectbox("RM Segmentation",opts2("RM Segmentation"),key="d2_seg")
+        f2_inco    = fc[2].selectbox("INCO Term",       opts2("INCO Term"),     key="d2_inco")
+        f2_cat     = fc[3].selectbox("Category",        opts2("Category"),      key="d2_cat")
+        f2_src     = fc[4].selectbox("Source Country",  opts2("Source Country"),key="d2_src")
+        f2_rmcg    = fc[5].selectbox("RM Class Group",  opts2("RM Class Group"),key="d2_rmcg")
+        fc[6].markdown("<br>", unsafe_allow_html=True)
+        fc[6].button("🔍", key="d2_search", use_container_width=True)
+
+    fdf2 = sku_df.copy()
+    if f2_country != "All": fdf2 = fdf2[fdf2["Region"]         == f2_country]
+    if f2_rm_seg  != "All": fdf2 = fdf2[fdf2["RM Segmentation"]== f2_rm_seg]
+    if f2_inco    != "All": fdf2 = fdf2[fdf2["INCO Term"]       == f2_inco]
+    if f2_cat     != "All": fdf2 = fdf2[fdf2["Category"]        == f2_cat]
+    if f2_src     != "All": fdf2 = fdf2[fdf2["Source Country"]  == f2_src]
+    if f2_rmcg    != "All": fdf2 = fdf2[fdf2["RM Class Group"]  == f2_rmcg]
+
+    # Weighted-avg DSI helper
+    def weighted_dsi(df, group_col):
+        ads_col = "Average Daily Sales (Future)"
+        grp = df.groupby(group_col).apply(
+            lambda g: round(
+                (g["8 Reasons (DSI)"] * g[ads_col]).sum() / g[ads_col].sum()
+                if g[ads_col].sum() != 0 else 0, 1)
+        ).reset_index(name="8 Reasons (DSI)")
+        return grp
+
+    # ── Region & Plant bar charts ──────────────────────────────────────────
+    c1, c2 = st.columns(2)
+    def make_bar(df, group_col, title):
+        grp = weighted_dsi(df, group_col)
+        fig = go.Figure(go.Bar(
+            x=grp[group_col], y=grp["8 Reasons (DSI)"],
+            marker_color="#1e3a7b",
+            text=grp["8 Reasons (DSI)"].apply(lambda v: f"{v:.0f}"),
+            textposition="inside", textfont=dict(color="gold", size=13, family="Arial Black")
+        ))
+        fig.update_layout(
+            title=dict(text=title, x=0.04, font=dict(size=13, color="#1a1a2e")),
+            margin=dict(l=10,r=10,t=40,b=10), height=280,
+            plot_bgcolor="white", paper_bgcolor="white",
+            yaxis=dict(gridcolor="#e9ecef", title="DSI (days)"),
+            xaxis=dict(tickfont=dict(size=10))
+        )
+        return fig
+
+    with c1:
+        region_fig = make_bar(fdf2, "Region", "Region Wise 8 Reasons DSI")
+        st.plotly_chart(region_fig, use_container_width=True)
+    with c2:
+        plant_fig  = make_bar(fdf2, "PLANT",  "Plant Wise 8 Reasons DSI")
+        st.plotly_chart(plant_fig,  use_container_width=True)
+
+    # ── Supply source maps ─────────────────────────────────────────────────
+    st.markdown("#### 🌍 Plant Wise 8 Reasons DSI — Supply Source Map")
+
+    COUNTRY_COORDS = {
+        "India": (20.6, 78.9), "China": (35.9, 104.2), "VIETNAM": (14.1, 108.3),
+        "Thailand": (15.9, 100.9), "Korea": (37.6, 127.0), "South Africa": (-29.0, 25.1),
+        "Indonesia": (-0.8, 113.9), "USA": (37.1, -95.7), "Taiwan": (23.7, 121.0),
+        "Netherland": (52.1, 5.3), "Netherlands": (52.1, 5.3), "Germany": (51.2, 10.5),
+        "BELGIUM": (50.5, 4.5), "Belgium": (50.5, 4.5), "France": (46.2, 2.2),
+        "Russia": (61.5, 105.3), "Singapore": (1.4, 103.8), "Saudi Arabia": (23.9, 45.1),
+        "S.KOREA": (36.5, 127.8), "Malaysia": (4.2, 101.9), "Japan": (36.2, 138.3),
+        "Brazil": (-10.0, -55.0), "Mexico": (23.6, -102.6), "Turkey": (38.9, 35.2),
+        "UK": (52.4, -1.9), "Italy": (41.9, 12.6), "Poland": (51.9, 19.1),
+        "Local(Imported)": (20.6, 78.9),
+    }
+    PLANT_COORDS = {
+        "Aurangabad": (19.88, 75.34),
+        "Ballabgarh": (28.34, 77.33),
+        "Pulandian":  (39.40, 121.97),
+    }
+
+    plants = sorted(fdf2["PLANT"].dropna().unique().tolist())
+    if not plants:
+        st.info("No plant data after filters.")
+    else:
+        map_cols = st.columns(min(len(plants), 3))
+        for pi, plant in enumerate(plants):
+            plant_df     = fdf2[fdf2["PLANT"] == plant]
+            src_countries= plant_df["Source Country"].dropna().unique().tolist()
+            plant_lat, plant_lon = PLANT_COORDS.get(plant, (20.0, 78.0))
+            plant_dsi    = round((plant_df["8 Reasons (DSI)"] * plant_df["Average Daily Sales (Future)"]).sum()
+                                  / plant_df["Average Daily Sales (Future)"].sum()
+                                  if plant_df["Average Daily Sales (Future)"].sum() != 0 else 0, 1)
+
+            fig_map = go.Figure()
+            for sc in src_countries:
+                coords = COUNTRY_COORDS.get(sc)
+                if coords:
+                    fig_map.add_trace(go.Scattergeo(
+                        lon=[coords[1], plant_lon], lat=[coords[0], plant_lat],
+                        mode="lines", line=dict(width=1.5, color="red"),
+                        showlegend=False
+                    ))
+                    fig_map.add_trace(go.Scattergeo(
+                        lon=[coords[1]], lat=[coords[0]], mode="markers",
+                        marker=dict(size=7, color="red", symbol="circle"),
+                        showlegend=False, hovertext=sc, hoverinfo="text"
+                    ))
+            # Plant marker
+            fig_map.add_trace(go.Scattergeo(
+                lon=[plant_lon], lat=[plant_lat], mode="markers+text",
+                marker=dict(size=12, color="#1e3a7b", symbol="star"),
+                text=[plant], textposition="top center",
+                textfont=dict(size=10, color="#1e3a7b"),
+                showlegend=False, hovertext=f"{plant}: {plant_dsi} DSI"
+            ))
+            fig_map.update_layout(
+                title=dict(text=f"<b>{plant}</b>  ({plant_dsi} DSI days)", x=0.5,
+                           font=dict(size=13, color="#1a1a2e")),
+                geo=dict(
+                    showland=True, landcolor="#e8f5e9",
+                    showocean=True, oceancolor="#bbdefb",
+                    showcountries=True, countrycolor="#bbb",
+                    projection_type="natural earth",
+                    showframe=False,
+                ),
+                margin=dict(l=0,r=0,t=36,b=0), height=340, paper_bgcolor="white"
+            )
+            with map_cols[pi % 3]:
+                st.plotly_chart(fig_map, use_container_width=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DASHBOARD 3 — R1–R8 Deep Dive + Segmentation Matrix
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "📈 Dashboard 3":
+    import plotly.graph_objects as go
+    import plotly.express as px
+
+    st.markdown("""
+    <style>
+    .d3-title {font-size:26px;font-weight:700;color:#1a1a2e;text-align:center;margin-bottom:8px}
+    </style>""", unsafe_allow_html=True)
+    st.markdown("<div class='d3-title'>8 Reasons of Inventory — R1–R8 Deep Dive</div>", unsafe_allow_html=True)
+
+    if not st.session_state.get("final_output_b64"):
+        st.warning("⚠️ Please complete the **Final Output** step first.")
+        st.stop()
+
+    fo_bytes = b64_to_bytes(st.session_state["final_output_b64"])
+    sku_df   = pd.read_excel(BytesIO(fo_bytes), sheet_name="SKU Level")
+
+    def opts3(col): return ["All"] + sorted(sku_df[col].dropna().unique().astype(str).tolist())
+
+    # ── Filters ────────────────────────────────────────────────────────────
+    fc = st.columns([1,1,1,1,1,0.6])
+    f3_plant  = fc[0].selectbox("Plant",           opts3("PLANT"),           key="d3_plant")
+    f3_seg    = fc[1].selectbox("RM Segmentation", opts3("RM Segmentation"), key="d3_seg")
+    f3_cat    = fc[2].selectbox("Category",         opts3("Category"),        key="d3_cat")
+    f3_inco   = fc[3].selectbox("INCO Term",        opts3("INCO Term"),       key="d3_inco")
+    f3_plan   = fc[4].selectbox("Planning Cycle",   opts3("Planning cycle"),  key="d3_plan")
+    fc[5].markdown("<br>", unsafe_allow_html=True)
+    fc[5].button("🔍", key="d3_search", use_container_width=True)
+
+    fdf3 = sku_df.copy()
+    if f3_plant != "All": fdf3 = fdf3[fdf3["PLANT"]           == f3_plant]
+    if f3_seg   != "All": fdf3 = fdf3[fdf3["RM Segmentation"] == f3_seg]
+    if f3_cat   != "All": fdf3 = fdf3[fdf3["Category"]        == f3_cat]
+    if f3_inco  != "All": fdf3 = fdf3[fdf3["INCO Term"]       == f3_inco]
+    if f3_plan  != "All": fdf3 = fdf3[fdf3["Planning cycle"]  == f3_plan]
+
+    R_COLS   = ["R1 Information Cycle (DSI)","R2 Manufacturing Lot Size (DSI)",
+                "R3 Shipping Lot Size (DSI)","R4 Shipping Interval (DSI)",
+                "R5 Geography (DSI)","R6 Shipping Variation (DSI)",
+                "R7 Supply Variation (DSI)","R8 Demand Variation (DSI)"]
+    R_LABELS = ["R1 Info Cycle","R2 Mfg Lot","R3 Ship Lot","R4 Ship Interval",
+                "R5 Geography","R6 Ship Var","R7 Supply Var","R8 Demand Var"]
+    R_COLORS = ["#1565C0","#1976D2","#1E88E5","#42A5F5",
+                "#EF6C00","#F57C00","#FB8C00","#FFA726"]
+
+    n3 = len(fdf3)
+
+    # ── KPI row ────────────────────────────────────────────────────────────
+    k_cols = st.columns(4)
+    k_cols[0].metric("Total SKUs",          n3)
+    k_cols[1].metric("Avg 8 Reasons (DSI)", f"{round(fdf3['8 Reasons (DSI)'].mean(),1) if n3 else 0} days")
+    k_cols[2].metric("Avg Safety (DSI)",    f"{round(fdf3['Safety (DSI)'].mean(),1)     if n3 else 0} days")
+    k_cols[3].metric("Avg Transit (DSI)",   f"{round(fdf3['Transit (DSI)'].mean(),1)    if n3 else 0} days")
+    st.markdown("---")
+
+    c1, c2 = st.columns(2)
+
+    # ── R1–R8 average DSI horizontal bar ──────────────────────────────────
+    with c1:
+        st.markdown("**Average R1–R8 DSI Contribution**")
+        avgs = [round(fdf3[c].mean(), 2) if n3 else 0 for c in R_COLS]
+        fig1 = go.Figure(go.Bar(
+            y=R_LABELS, x=avgs, orientation="h",
+            marker_color=R_COLORS,
+            text=[f"{v:.2f}" for v in avgs], textposition="outside"
+        ))
+        fig1.update_layout(
+            margin=dict(l=10,r=60,t=10,b=10), height=320,
+            plot_bgcolor="white", paper_bgcolor="white",
+            xaxis=dict(gridcolor="#e9ecef", title="DSI (days)"),
+            yaxis=dict(tickfont=dict(size=11))
+        )
+        st.plotly_chart(fig1, use_container_width=True)
+
+    # ── Stacked DSI by INCO term ──────────────────────────────────────────
+    with c2:
+        st.markdown("**Cycle / Transit / Safety DSI by INCO Term**")
+        grp_inco = fdf3.groupby("INCO Term")[["Cycle (DSI)","Transit (DSI)","Safety (DSI)"]].mean().reset_index()
+        fig2 = go.Figure()
+        for col, color in [("Cycle (DSI)","#1565C0"),("Transit (DSI)","#42A5F5"),("Safety (DSI)","#FFA726")]:
+            fig2.add_trace(go.Bar(name=col, x=grp_inco["INCO Term"],
+                                  y=grp_inco[col].round(1), marker_color=color))
+        fig2.update_layout(
+            barmode="stack", margin=dict(l=10,r=10,t=10,b=10), height=320,
+            plot_bgcolor="white", paper_bgcolor="white",
+            yaxis=dict(gridcolor="#e9ecef", title="DSI (days)"),
+            legend=dict(orientation="h", y=-0.25)
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+
+    c3, c4 = st.columns(2)
+
+    # ── RM Segmentation heatmap matrix ────────────────────────────────────
+    with c3:
+        st.markdown("**RM Segmentation Matrix — Avg 8 Reasons DSI**")
+        st.caption("Rows = Consumption Value (A=High → C=Low) | Cols = Variability (1=Low → 3=High)")
+        seg_rows  = ["A","B","C"]
+        seg_cols_l= ["1","2","3"]
+        matrix, hover_text = [], []
+        for r in seg_rows:
+            row_vals, row_hover = [], []
+            for cl in seg_cols_l:
+                seg = r + cl
+                sub = fdf3[fdf3["RM Segmentation"] == seg]
+                v   = round(sub["8 Reasons (DSI)"].mean(), 1) if len(sub) else 0
+                row_vals.append(v)
+                row_hover.append(f"{seg}: {v} DSI<br>{len(sub)} SKUs")
+            matrix.append(row_vals)
+            hover_text.append(row_hover)
+
+        # Highlight A1 cell with a border annotation
+        fig3 = go.Figure(go.Heatmap(
+            z=matrix,
+            x=["Low Var (1)","Med Var (2)","High Var (3)"],
+            y=["High Value (A)","Med Value (B)","Low Value (C)"],
+            colorscale=[[0,"#e8f5e9"],[0.5,"#1976D2"],[1,"#0d47a1"]],
+            text=hover_text, hoverinfo="text",
+            customdata=matrix, texttemplate="%{customdata}",
+            showscale=True, colorbar=dict(title="DSI")
+        ))
+        # Box around A1 (top-left = index [0][0])
+        fig3.add_shape(type="rect", x0=-0.5, x1=0.5, y0=1.5, y1=2.5,
+                       line=dict(color="#43a047", width=3))
+        fig3.update_layout(
+            margin=dict(l=10,r=10,t=10,b=10), height=300, paper_bgcolor="white",
+            yaxis=dict(autorange="reversed")
+        )
+        st.plotly_chart(fig3, use_container_width=True)
+
+    # ── Under Min / Over Max by Plant ──────────────────────────────────────
+    with c4:
+        st.markdown("**Under Min / Over Max Value by Plant ($M)**")
+        grp_pl = fdf3.groupby("PLANT")[["Under Min (Val)","Over Max (Val)"]].sum().reset_index()
+        fig4 = go.Figure()
+        fig4.add_trace(go.Bar(name="Under Min ($M)", x=grp_pl["PLANT"],
+                               y=grp_pl["Under Min (Val)"].round(3), marker_color="#EF5350"))
+        fig4.add_trace(go.Bar(name="Over Max ($M)",  x=grp_pl["PLANT"],
+                               y=grp_pl["Over Max (Val)"].abs().round(3), marker_color="#42A5F5"))
+        fig4.update_layout(
+            barmode="group", margin=dict(l=10,r=10,t=10,b=10), height=300,
+            plot_bgcolor="white", paper_bgcolor="white",
+            yaxis=dict(gridcolor="#e9ecef", title="Value ($M)"),
+            legend=dict(orientation="h", y=-0.25)
+        )
+        st.plotly_chart(fig4, use_container_width=True)
+
+    # ── SKU-level detail table ────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("**📋 SKU-Level Detail**")
+    display_cols = ["PLANT","Material Code","Material Desc","RM Segmentation","Category",
+                    "INCO Term","Planning cycle","8 Reasons (DSI)","Cycle (DSI)",
+                    "Transit (DSI)","Safety (DSI)","8 Reasons (Units)",
+                    "Under Min (Val)","Over Max (Val)","Historical Data Quality"]
+    available = [c for c in display_cols if c in fdf3.columns]
+    st.dataframe(
+        fdf3[available].reset_index(drop=True)
+                       .style.format({col: "{:.2f}" for col in available if fdf3[col].dtype in ["float64","float32"]},
+                                     na_rep="—"),
+        use_container_width=True, height=380
+    )
