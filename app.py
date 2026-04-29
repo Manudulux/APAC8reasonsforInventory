@@ -692,7 +692,7 @@ elif page == "📊 Dashboard 1":
                 xref="paper", yref="paper", x=0, y=1.05,
                 text="Consumption Qty (MT)", showarrow=False,
                 font=dict(size=10, color="#1e3a7b"), bgcolor="#1e3a7b",
-                fontcolor="white", borderpad=4
+                font=dict(color="white"), borderpad=4
             )
             st.plotly_chart(fig_c, use_container_width=True)
         else:
