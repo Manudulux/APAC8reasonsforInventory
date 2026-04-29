@@ -1,0 +1,83 @@
+{
+    "global_parameters": [
+        {
+            "forecast": {
+                "weekly_split_method": 1,
+                "demand_variation_method": "Both",
+                "Skewness": true
+            },
+            "cappings": {
+                "safety_stock_cap": 90,
+                "transit_time_cap": 50,
+                "shipping_interval_cap": 10,
+                "Maximum Demand in % of Forecast": 120
+            },
+            "cycle_stock": {
+                "calculation_methodology": "Max"
+            },
+            "tolerance": {
+                "local": 1,
+                "imported": 7
+            },
+            "rm_segmentation": {
+                "variance": {
+                    "1": [
+                        0,
+                        41
+                    ],
+                    "2": [
+                        41,
+                        60
+                    ],
+                    "3": [
+                        60,
+                        100
+                    ]
+                },
+                "segment": {
+                    "A": [
+                        0,
+                        80
+                    ],
+                    "B": [
+                        80,
+                        96
+                    ],
+                    "C": [
+                        96,
+                        100
+                    ]
+                }
+            },
+            "service_level_mapping": {
+                "A1": 97,
+                "A2": 96,
+                "A3": 95,
+                "B1": 94,
+                "B2": 93,
+                "B3": 92,
+                "C1": 91,
+                "C2": 90,
+                "C3": 89
+            },
+            "production_days": {
+                "M1": 30,
+                "M2": 29,
+                "M3": 30,
+                "M4": 30,
+                "M5": 27,
+                "M6": 28
+            },
+            "price_conversion": {
+                "USD_value": 84
+            },
+            "default_values": {
+                "transit_time_local": 7,
+                "transit_time_imported": 30,
+                "shipping_interval_local": 30,
+                "shipping_interval_imported": 30,
+                "supply_reliability": 90
+            }
+        }
+    ]
+}
