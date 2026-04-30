@@ -101,10 +101,10 @@ with st.sidebar:
     st.markdown("---")
     page = st.radio("Navigation", [
         "🏠 Home",
+        "🔧 Global Settings",
         "📂 Upload & Validate",
         "⚙️ Intermediate File",
         "📊 Final Output",
-        "🔧 Global Settings",
         "📊 Dashboard 1",
         "🗺️ Dashboard 2",
         "📈 Dashboard 3",
@@ -155,7 +155,6 @@ elif page == "📂 Upload & Validate":
         "**How would you like to load the input files?**",
         [
             "📁 Load from script directory (files already in repo)",
-            "🐙 Load from GitHub repository URL",
             "⬆️ Upload files manually",
         ],
         horizontal=False,
@@ -205,82 +204,70 @@ elif page == "📂 Upload & Validate":
                                 file_bytes[key] = f.read()
                                 st.session_state["_local_files"][key] = file_bytes[key]
 
-    # ── Option 2 : GitHub URL ─────────────────────────────────────────────────
-    elif source == "🐙 Load from GitHub repository URL":
-        import requests
-
+    # ── Option 2 : multi-file upload ─────────────────────────────────────────
+    else:
         st.markdown("""
-        Enter the URL of a GitHub repository or subfolder. The tool will look for the
-        standard input file names at that location.
-
-        **Examples:**
-        - `https://github.com/Manudulux/APAC8reasonsforInventory`
-        - `https://github.com/YourOrg/YourRepo/tree/main/data/inputs`
+        Drop all **12 Excel files at once** into the box below, or click to browse.
+        The tool will automatically match each file to the correct input slot by filename.
         """)
 
-        gh_url   = st.text_input("GitHub repository / folder URL",
-                                  placeholder="https://github.com/Manudulux/APAC8reasonsforInventory")
-        subfolder = st.text_input("Subfolder within repo (leave blank for root)",
-                                   placeholder="e.g. data/inputs").strip()
+        # Expected filename → variable key mapping (reverse lookup)
+        FILENAME_TO_KEY = {v[1].lower(): k for k, v in FILE_META.items()}
 
-        def gh_to_raw(url: str, sub: str) -> str:
-            url = url.strip().rstrip("/")
-            url = url.replace("https://github.com/", "https://raw.githubusercontent.com/")
-            url = url.replace("/tree/", "/")
-            parts = url.replace("https://raw.githubusercontent.com/", "").split("/")
-            if len(parts) == 2:          # no branch — assume main
-                url += "/main"
-            if sub:
-                url = url.rstrip("/") + "/" + sub.strip("/")
-            return url
+        uploaded_multi = st.file_uploader(
+            "Drop all 12 input files here",
+            type=["xlsx", "xls"],
+            accept_multiple_files=True,
+            key="multi_upload",
+            help="You can select or drop all 12 files in one go."
+        )
 
-        if st.button("🔍 Fetch files from GitHub", disabled=not gh_url.strip()):
-            raw_base = gh_to_raw(gh_url, subfolder)
-            progress = st.progress(0)
-            status   = st.empty()
-            gh_found, gh_missing = {}, []
+        if uploaded_multi:
+            unmatched = []
+            for uf in uploaded_multi:
+                fname_lower = uf.name.lower()
+                matched_key = None
+                # Try exact filename match first
+                if fname_lower in FILENAME_TO_KEY:
+                    matched_key = FILENAME_TO_KEY[fname_lower]
+                else:
+                    # Fuzzy: check if any key substring appears in filename
+                    for key, (label, fname) in FILE_META.items():
+                        if fname.lower().replace(".xlsx","") in fname_lower or \
+                           fname_lower.replace(".xlsx","") in fname.lower().replace(".xlsx",""):
+                            matched_key = key
+                            break
+                if matched_key:
+                    file_bytes[matched_key] = uf.read()
+                else:
+                    unmatched.append(uf.name)
 
-            for idx, (key, (label, filename)) in enumerate(FILE_META.items()):
-                status.text(f"Fetching {filename}…")
-                try:
-                    r = requests.get(f"{raw_base}/{filename}", timeout=15)
-                    if r.status_code == 200:
-                        gh_found[key] = r.content
-                    else:
-                        gh_missing.append(label)
-                except Exception:
-                    gh_missing.append(label)
-                progress.progress((idx + 1) / len(FILE_META))
+            # Show match status
+            c_ok, c_miss = st.columns(2)
+            with c_ok:
+                if file_bytes:
+                    st.success(f"✅ **{len(file_bytes)}/{len(FILE_META)} files matched:**")
+                    for k in file_bytes:
+                        st.markdown(f"  - ✅ {FILE_META[k][0]}")
+            with c_miss:
+                missing_keys = [k for k in FILE_META if k not in file_bytes]
+                if missing_keys:
+                    st.warning(f"⚠️ **{len(missing_keys)} still needed:**")
+                    for k in missing_keys:
+                        st.markdown(f"  - ❌ {FILE_META[k][0]}")
+                if unmatched:
+                    st.error(f"Could not match: {', '.join(unmatched)}")
 
-            progress.empty(); status.empty()
-            st.session_state["_github_files"] = gh_found
-            if gh_found:
-                st.success(f"✅ {len(gh_found)}/{len(FILE_META)} files loaded from GitHub.")
-            if gh_missing:
-                st.warning("⚠️ Could not fetch: " + ", ".join(gh_missing))
-
-        if st.session_state.get("_github_files"):
-            file_bytes = dict(st.session_state["_github_files"])
-            missing_gh = [k for k in FILE_META if k not in file_bytes]
-            if missing_gh:
-                with st.expander("📎 Upload missing files manually"):
-                    cols = st.columns(2)
-                    for i, key in enumerate(missing_gh):
-                        with cols[i % 2]:
-                            f = st.file_uploader(FILE_META[key][0], type=["xlsx", "xls"], key=f"gh_up_{key}")
-                            if f:
-                                file_bytes[key] = f.read()
-                                st.session_state["_github_files"][key] = file_bytes[key]
-
-    # ── Option 3 : manual upload ──────────────────────────────────────────────
-    else:
-        st.markdown("Upload each of the 12 required Excel files below.")
-        cols = st.columns(2)
-        for i, (key, (label, _)) in enumerate(FILE_META.items()):
-            with cols[i % 2]:
-                f = st.file_uploader(label, type=["xlsx", "xls"], key=f"up_{key}")
-                if f:
-                    file_bytes[key] = f.read()
+        # Individual uploaders for any remaining unmatched files
+        missing_keys = [k for k in FILE_META if k not in file_bytes]
+        if missing_keys:
+            with st.expander(f"📎 Upload remaining {len(missing_keys)} file(s) individually"):
+                cols = st.columns(2)
+                for i, key in enumerate(missing_keys):
+                    with cols[i % 2]:
+                        f = st.file_uploader(FILE_META[key][0], type=["xlsx","xls"], key=f"ind_{key}")
+                        if f:
+                            file_bytes[key] = f.read()
 
     st.markdown(f"**{len(file_bytes)} / {len(FILE_META)} files ready**")
     st.markdown("---")
@@ -946,18 +933,22 @@ elif page == "📈 Dashboard 3":
     with c3:
         st.markdown("**RM Segmentation Matrix — Avg 8 Reasons DSI**")
         st.caption("Rows = Consumption Value (A=High → C=Low) | Cols = Variability (1=Low → 3=High)")
-        seg_rows  = ["A","B","C"]
-        seg_cols_l= ["1","2","3"]
-        matrix, hover_text = [], []
+        # Build matrix values, per-cell labels, and hover text
+        seg_rows   = ["A","B","C"]
+        seg_cols_l = ["1","2","3"]
+        matrix, cell_text, hover_text = [], [], []
         for r in seg_rows:
-            row_vals, row_hover = [], []
+            row_vals, row_text, row_hover = [], [], []
             for cl in seg_cols_l:
                 seg = r + cl
                 sub = fdf3[fdf3["RM Segmentation"] == seg]
                 v   = round(sub["8 Reasons (DSI)"].mean(), 1) if len(sub) else 0
+                n_s = len(sub)
                 row_vals.append(v)
-                row_hover.append(f"{seg}: {v} DSI<br>{len(sub)} SKUs")
+                row_text.append(f"<b>{v}</b> DSI<br>{n_s} SKUs")
+                row_hover.append(f"<b>{seg}</b><br>{v} DSI | {n_s} SKUs")
             matrix.append(row_vals)
+            cell_text.append(row_text)
             hover_text.append(row_hover)
 
         # Highlight A1 cell with a border annotation
@@ -966,8 +957,11 @@ elif page == "📈 Dashboard 3":
             x=["Low Var (1)","Med Var (2)","High Var (3)"],
             y=["High Value (A)","Med Value (B)","Low Value (C)"],
             colorscale=[[0,"#e8f5e9"],[0.5,"#1976D2"],[1,"#0d47a1"]],
-            text=hover_text, hoverinfo="text",
-            customdata=matrix, texttemplate="%{customdata}",
+            text=cell_text,
+            hovertext=hover_text,
+            hoverinfo="text",
+            texttemplate="%{text}",
+            textfont=dict(size=12, color="white"),
             showscale=True, colorbar=dict(title="DSI")
         ))
         # Box around A1 (top-left = index [0][0])
