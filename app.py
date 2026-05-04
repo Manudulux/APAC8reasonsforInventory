@@ -319,9 +319,9 @@ elif page == "⚙️ Intermediate File":
     if st.button("🔄 Generate Intermediate Output", type="primary"):
         with st.spinner("Calculating… (this may take a minute)"):
             try:
-                validated_data    = st.session_state["validated_data"]
+                validated_data      = st.session_state["validated_data"]
                 intermediate_output = GenerateIntermediateOutput(validated_data).generate_intermediate_response()
-                response          = IntermediateFile(validated_data).make_response(intermediate_output)
+                response            = IntermediateFile(validated_data).make_response(intermediate_output)
 
                 if isinstance(response, str) and response.lower().startswith("error"):
                     st.error(f"❌ {response}")
@@ -338,21 +338,81 @@ elif page == "⚙️ Intermediate File":
 
     if st.session_state.get("intermediate_data"):
         st.success("✅ Intermediate output is ready.")
-        st.subheader("📥 Download Intermediate Sheets")
-        cols = st.columns(3)
-        for i, sheet in enumerate(st.session_state["intermediate_data"].get("Sheets", [])):
-            b64  = sheet.get("Data", "")
-            name = sheet.get("Variable", f"Sheet_{i}")
-            if b64:
-                with cols[i % 3]:
-                    make_download_button(b64, f"{name}.xlsx", f"⬇ {name}")
+        st.markdown("---")
 
+        # ── Build list of all sheets (regular + RM Segmentation) ────────────
+        all_sheets = []   # list of {"name": str, "session_key": str, "b64": str}
+        for sheet in st.session_state["intermediate_data"].get("Sheets", []):
+            b64  = sheet.get("Data", "")
+            name = sheet.get("Variable", "")
+            if b64 and name:
+                all_sheets.append({"name": name, "b64": b64, "is_rm_seg": False})
         rm_b64 = st.session_state.get("rm_seg_b64", "")
         if rm_b64:
-            st.markdown("---")
-            make_download_button(rm_b64, "RM_Segmentation_Output.xlsx", "⬇ RM Segmentation Output")
+            all_sheets.append({"name": "RM_Segmentation_Output", "b64": rm_b64, "is_rm_seg": True})
 
+        # ── Tab layout: Download | Upload & Override ──────────────────────
+        tab_dl, tab_ul = st.tabs(["📥 Download Intermediate Sheets", "📤 Upload & Override Sheets"])
+
+        # ── Download tab ──────────────────────────────────────────────────
+        with tab_dl:
+            st.markdown(
+                "Download any sheet, edit it in Excel, then upload it back in the **Upload & Override** tab "
+                "before running the Final Output."
+            )
+            cols = st.columns(3)
+            for i, s in enumerate(all_sheets):
+                with cols[i % 3]:
+                    make_download_button(s["b64"], f"{s['name']}.xlsx", f"⬇ {s['name']}")
+
+        # ── Upload & Override tab ─────────────────────────────────────────
+        with tab_ul:
+            st.markdown("""
+            Upload modified versions of one or more intermediate sheets.
+            Each uploaded file will **replace** the corresponding generated sheet before the Final Output runs.
+            """)
+
+            # Build a name → index map for quick lookup inside Sheets list
+            sheet_names = [s["name"] for s in all_sheets]
+
+            override_cols = st.columns(3)
+            any_overridden = False
+
+            for i, s in enumerate(all_sheets):
+                with override_cols[i % 3]:
+                    uf = st.file_uploader(
+                        f"Replace **{s['name']}**",
+                        type=["xlsx", "xls"],
+                        key=f"override_{s['name']}",
+                    )
+                    if uf:
+                        new_b64 = base64.b64encode(uf.read()).decode("utf-8")
+                        any_overridden = True
+
+                        if s["is_rm_seg"]:
+                            # Update RM Segmentation b64 directly in session
+                            st.session_state["rm_seg_b64"] = new_b64
+                            st.success(f"✅ {s['name']} overridden")
+                        else:
+                            # Update the matching sheet inside intermediate_data["Sheets"]
+                            sheets_list = st.session_state["intermediate_data"]["Sheets"]
+                            for sheet in sheets_list:
+                                if sheet.get("Variable") == s["name"]:
+                                    sheet["Data"] = new_b64
+                                    break
+                            st.success(f"✅ {s['name']} overridden")
+
+            if any_overridden:
+                st.info(
+                    "✏️ One or more sheets have been overridden. "
+                    "Proceed to **Final Output** to run the calculation with your modified data."
+                )
+            else:
+                st.caption("No overrides applied yet — all sheets will use the generated values.")
+
+        st.markdown("---")
         st.info("👈 Proceed to **Final Output** in the sidebar.")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # FINAL OUTPUT
