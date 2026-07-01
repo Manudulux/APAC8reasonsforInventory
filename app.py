@@ -224,19 +224,15 @@ def unique_sku_count(df: pd.DataFrame) -> int:
     return int(df.drop_duplicates().shape[0])
 
 
-def inventory_value_million(df: pd.DataFrame) -> float:
+def inventory_value_dollars(df: pd.DataFrame) -> float:
     """
-    Correct 8 Reasons Inventory Value calculation.
+    Correct 8 Reasons Inventory Value calculation in dollars.
 
-    Formula:
-        SUM(row-level 8 Reasons Units × row-level MAP) / 1,000,000
+    Business formula requested:
+        SUM(row-level 8 Reasons Units × row-level MAP) / 100
 
-    This explicitly replaces the old unsafe formula:
-        SUM(8 Reasons Units) × AVG(MAP) / 1,000,000
-
-    Row-level multiplication is required because each SKU/material can have a
-    different MAP. Using an unweighted average MAP loses mix effect and can
-    materially understate or overstate the value.
+    The result is displayed as a full dollar amount, for example:
+        $ 12,135,518
     """
     if df is None or df.empty:
         return 0.0
@@ -260,9 +256,9 @@ def inventory_value_million(df: pd.DataFrame) -> float:
     if units_col and price_col:
         units = to_numeric_safe(df[units_col])
         price = to_numeric_safe(df[price_col])
-        return round(float((units * price).sum() / 1_000_000), 2)
+        return round(float((units * price).sum() / 100), 0)
 
-    # Fallback: if a value column already exists, sum it.
+    # Fallback: if a value column already exists, sum it as dollars.
     value_col = first_existing_col(df, [
         "8 Reasons Inventory Value",
         "8 Reasons Value",
@@ -271,26 +267,33 @@ def inventory_value_million(df: pd.DataFrame) -> float:
         "Value",
     ])
     if value_col:
-        value = to_numeric_safe(df[value_col]).sum()
-        # If the column name explicitly indicates millions, do not divide again.
-        if "million" in value_col.lower() or "m$" in value_col.lower():
-            return round(float(value), 2)
-        return round(float(value / 1_000_000), 2)
+        return round(float(to_numeric_safe(df[value_col]).sum()), 0)
 
     return 0.0
 
 
+def inventory_value_million(df: pd.DataFrame) -> float:
+    """
+    Backward-compatible wrapper.
+
+    Despite the historical function name, Dashboard 1 now uses this value as
+    full dollars based on:
+        SUM(row-level 8 Reasons Units × row-level MAP) / 100
+    """
+    return inventory_value_dollars(df)
+
+
 def inventory_value_detail_by_material(df: pd.DataFrame):
     """
-    Build a transparent material-level audit table for Dashboard 1.
+    Build a material-level audit table for Dashboard 1.
 
-    The KPI shown in Dashboard 1 is intended to be exactly the grand total of:
-        row value $ = 8 Reasons Units × MAP
-        8 Reasons Inventory Value M$ = SUM(row value $) / 1,000,000
+    The KPI shown in Dashboard 1 is exactly the grand total of:
+        Formula numerator = 8 Reasons Units × MAP
+        8 Reasons Inventory Value ($) = Formula numerator / 100
 
     Returns:
         detail_df: material-level table including a final TOTAL row
-        diagnostics: dictionary describing the source columns and data quality checks
+        diagnostics: dictionary describing source columns and data quality checks
     """
     diagnostics = {
         "units_col": None,
@@ -300,7 +303,7 @@ def inventory_value_detail_by_material(df: pd.DataFrame):
         "materials": 0,
         "zero_or_blank_units_rows": 0,
         "zero_or_blank_map_rows": 0,
-        "calculated_total_musd": 0.0,
+        "calculated_total_dollars": 0.0,
     }
 
     if df is None or df.empty:
@@ -333,11 +336,12 @@ def inventory_value_detail_by_material(df: pd.DataFrame):
     work = df.copy()
     work["_8R_Units"] = to_numeric_safe(work[units_col])
     work["_MAP"] = to_numeric_safe(work[price_col])
-    work["_8R_Value_$"] = work["_8R_Units"] * work["_MAP"]
+    work["_Formula_Numerator"] = work["_8R_Units"] * work["_MAP"]
+    work["_8R_Value_$"] = work["_Formula_Numerator"] / 100
 
     diagnostics["zero_or_blank_units_rows"] = int((work["_8R_Units"] == 0).sum())
     diagnostics["zero_or_blank_map_rows"] = int((work["_MAP"] == 0).sum())
-    diagnostics["calculated_total_musd"] = round(float(work["_8R_Value_$"].sum() / 1_000_000), 2)
+    diagnostics["calculated_total_dollars"] = round(float(work["_8R_Value_$"].sum()), 0)
 
     material_code_col = first_existing_col(work, ["Material Code", "Material", "RM Code", "Item Code"])
     material_desc_col = first_existing_col(work, ["Material Desc", "Raw Material Desc", "Raw Material Description", "RM Description"])
@@ -349,7 +353,6 @@ def inventory_value_detail_by_material(df: pd.DataFrame):
         group_cols.append(material_code_col)
     if material_desc_col and material_desc_col not in group_cols:
         group_cols.append(material_desc_col)
-
     if not group_cols:
         work["_Material"] = "All materials"
         group_cols = ["_Material"]
@@ -363,27 +366,26 @@ def inventory_value_detail_by_material(df: pd.DataFrame):
         key_dict = dict(zip(group_cols, keys))
 
         units_sum = float(sub["_8R_Units"].sum())
+        numerator_sum = float(sub["_Formula_Numerator"].sum())
         value_sum = float(sub["_8R_Value_$"].sum())
-        weighted_map = float(value_sum / units_sum) if units_sum else 0.0
+        weighted_map = float(numerator_sum / units_sum) if units_sum else 0.0
 
-        row = {}
-        row["Material Code"] = key_dict.get(material_code_col, "") if material_code_col else ""
-        row["Material Desc"] = key_dict.get(material_desc_col, key_dict.get("_Material", "")) if material_desc_col or "_Material" in key_dict else ""
-        row["Plants"] = int(sub[plant_col].astype(str).nunique()) if plant_col else 0
-        row["RM Segmentation"] = (
-            sub[seg_col].dropna().astype(str).iloc[0]
-            if seg_col and sub[seg_col].dropna().astype(str).nunique() == 1
-            else ("Multiple" if seg_col and sub[seg_col].dropna().astype(str).nunique() > 1 else "")
-        )
-        row["Unique SKUs"] = unique_sku_count(sub)
-        row["Source Rows"] = int(len(sub))
-        row["8 Reasons Units"] = units_sum
-        row["Weighted MAP"] = weighted_map
-        row["Min MAP"] = float(sub["_MAP"].min()) if len(sub) else 0.0
-        row["Max MAP"] = float(sub["_MAP"].max()) if len(sub) else 0.0
-        row["8 Reasons Inventory Value ($)"] = value_sum
-        row["8 Reasons Inventory Value (M$)"] = value_sum / 1_000_000
-        rows.append(row)
+        rows.append({
+            "Material Code": key_dict.get(material_code_col, "") if material_code_col else "",
+            "Material Desc": key_dict.get(material_desc_col, key_dict.get("_Material", "")) if material_desc_col or "_Material" in key_dict else "",
+            "Plants": int(sub[plant_col].astype(str).nunique()) if plant_col else 0,
+            "RM Segmentation": (
+                sub[seg_col].dropna().astype(str).iloc[0]
+                if seg_col and sub[seg_col].dropna().astype(str).nunique() == 1
+                else ("Multiple" if seg_col and sub[seg_col].dropna().astype(str).nunique() > 1 else "")
+            ),
+            "Unique SKUs": unique_sku_count(sub),
+            "Source Rows": int(len(sub)),
+            "8 Reasons Units": units_sum,
+            "Weighted MAP": weighted_map,
+            "Formula Numerator (Units × MAP)": numerator_sum,
+            "8 Reasons Inventory Value ($)": value_sum,
+        })
 
     detail_df = pd.DataFrame(rows)
     if detail_df.empty:
@@ -394,6 +396,7 @@ def inventory_value_detail_by_material(df: pd.DataFrame):
     detail_df = detail_df.sort_values("8 Reasons Inventory Value ($)", ascending=False).reset_index(drop=True)
 
     total_units = float(detail_df["8 Reasons Units"].sum())
+    total_numerator = float(detail_df["Formula Numerator (Units × MAP)"].sum())
     total_row = {
         "Material Code": "TOTAL",
         "Material Desc": "All selected materials",
@@ -402,11 +405,9 @@ def inventory_value_detail_by_material(df: pd.DataFrame):
         "Unique SKUs": unique_sku_count(work),
         "Source Rows": int(len(work)),
         "8 Reasons Units": total_units,
-        "Weighted MAP": float(total_value / total_units) if total_units else 0.0,
-        "Min MAP": float(work["_MAP"].min()) if len(work) else 0.0,
-        "Max MAP": float(work["_MAP"].max()) if len(work) else 0.0,
+        "Weighted MAP": float(total_numerator / total_units) if total_units else 0.0,
+        "Formula Numerator (Units × MAP)": total_numerator,
         "8 Reasons Inventory Value ($)": total_value,
-        "8 Reasons Inventory Value (M$)": total_value / 1_000_000,
         "Share of Total Value": 1.0 if total_value else 0.0,
     }
     detail_df = pd.concat([detail_df, pd.DataFrame([total_row])], ignore_index=True)
@@ -1024,7 +1025,7 @@ elif page == "📊 Dashboard 1":
     with st.expander("🎯 AOP Targets (manual entry)", expanded=True):
         aop_cols = st.columns(3)
         aop_dsi  = aop_cols[0].number_input("AOP Target DSI (days)",        min_value=0.0, value=45.0,  step=0.5,  format="%.1f",  key="aop_dsi_input")
-        aop_val  = aop_cols[1].number_input("AOP Target Value (million $)",  min_value=0.0, value=10.0,  step=0.1,  format="%.2f",  key="aop_val_input")
+        aop_val  = aop_cols[1].number_input("AOP Target Value ($)",          min_value=0.0, value=10_000_000.0, step=100_000.0, format="%.0f", key="aop_val_dollars_input")
         aop_tons = aop_cols[2].number_input("AOP Target Tonnage (MT)",       min_value=0.0, value=500.0, step=10.0, format="%.0f",  key="aop_tons_input")
 
     n_total   = unique_sku_count(fdf)
@@ -1032,11 +1033,11 @@ elif page == "📊 Dashboard 1":
     tot_units = numeric_sum(fdf, "8 Reasons (Units)")
     # 8 Reasons Inventory Value: row-level Units × row-level MAP.
     # This intentionally removes the old formula: total units × average MAP.
-    tot_val   = inventory_value_million(fdf)
+    tot_val   = inventory_value_dollars(fdf)
     value_detail_df, value_diag = inventory_value_detail_by_material(fdf)
-    # Force the KPI to use the same material-detail calculation shown in the audit table.
-    if value_diag.get("calculated_total_musd", 0.0):
-        tot_val = value_diag["calculated_total_musd"]
+    # Force the KPI to reconcile exactly with the TOTAL row in the audit table.
+    if value_diag.get("calculated_total_dollars", 0.0):
+        tot_val = value_diag["calculated_total_dollars"]
     tot_tons  = round(tot_units / 1000, 1) if n_total else 0
 
     pct_dsi  = round(avg_dsi  / aop_dsi  * 100, 1) if aop_dsi  > 0 else 0.0
@@ -1062,28 +1063,29 @@ elif page == "📊 Dashboard 1":
             </div>""", unsafe_allow_html=True)
 
         kpi_card(k1, "Plant AOP DSI (days)",        "8 Reasons Inventory DSI",     f"{avg_dsi} days",     f"{aop_dsi:.1f} days", pct_dsi)
-        kpi_card(k2, "Plant AOP Value (million $)",  "8 Reasons Inventory Value",   f"${tot_val} M",       f"${aop_val:.2f} M",   pct_val)
+        kpi_card(k2, "Plant AOP Value ($)",          "8 Reasons Inventory Value",   f"$ {tot_val:,.0f}",   f"$ {aop_val:,.0f}",   pct_val)
         kpi_card(k3, "Plant AOP Tonnage (MT)",       "8 Reasons Inventory Tonnage", f"{tot_tons:,.1f} MT", f"{aop_tons:,.0f} MT", pct_tons)
 
-        with st.expander("🔎 8 Reasons Inventory Value — calculation detail", expanded=False):
+        with st.expander("🔎 8 Reasons Inventory Value — calculation detail", expanded=True):
             st.markdown("""
             **Calculation used for the value KPI**
 
             The **8 Reasons Inventory Value** is calculated at row level and then summed:
 
-            `Row value ($) = 8 Reasons Units × MAP`
+            `Row numerator = 8 Reasons Units × MAP`
 
-            `Total 8 Reasons Inventory Value (M$) = SUM(Row value $) / 1,000,000`
+            `Row value ($) = Row numerator / 100`
 
-            This table uses the **same filtered dataset** as Dashboard 1 and therefore reconciles to the KPI card above.
-            The final row named **TOTAL** is the value shown in the KPI.
+            `Total 8 Reasons Inventory Value ($) = SUM(Row value $)`
+
+            The material table below uses the **same filtered dataset** as Dashboard 1. The **TOTAL** row reconciles to the KPI card above.
             """)
 
             diag_cols = st.columns(4)
             diag_cols[0].metric("Rows used", f"{value_diag.get('source_rows', 0):,}")
             diag_cols[1].metric("Unique SKUs", f"{value_diag.get('unique_skus', 0):,}")
             diag_cols[2].metric("Materials", f"{value_diag.get('materials', 0):,}")
-            diag_cols[3].metric("Reconciled total", f"${value_diag.get('calculated_total_musd', 0.0):,.2f} M")
+            diag_cols[3].metric("Reconciled total", f"$ {value_diag.get('calculated_total_dollars', 0.0):,.0f}")
 
             st.caption(
                 f"Units column used: `{value_diag.get('units_col')}` | "
@@ -1108,20 +1110,17 @@ elif page == "📊 Dashboard 1":
                         "Source Rows": "{:,.0f}",
                         "8 Reasons Units": "{:,.2f}",
                         "Weighted MAP": "{:,.4f}",
-                        "Min MAP": "{:,.4f}",
-                        "Max MAP": "{:,.4f}",
-                        "8 Reasons Inventory Value ($)": "${:,.2f}",
-                        "8 Reasons Inventory Value (M$)": "${:,.2f}",
+                        "Formula Numerator (Units × MAP)": "{:,.2f}",
+                        "8 Reasons Inventory Value ($)": "$ {:,.0f}",
                         "Share of Total Value": "{:.1%}",
                     }),
                     use_container_width=True,
                     height=420,
                 )
 
-                csv_bytes = value_detail_df.to_csv(index=False).encode("utf-8")
                 st.download_button(
                     "⬇ Download value detail by material (CSV)",
-                    data=csv_bytes,
+                    data=value_detail_df.to_csv(index=False).encode("utf-8"),
                     file_name="dashboard1_8_reasons_inventory_value_detail.csv",
                     mime="text/csv",
                     key="d1_value_detail_csv",
@@ -1142,8 +1141,8 @@ elif page == "📊 Dashboard 1":
             pct = round(n / n_total * 100, 1) if n_total else 0
             tot_qty  = round(numeric_sum(sub, "8 Reasons (Units)") / 1000, 1)
             # RM Segmentation inventory value: row-level Units × row-level MAP.
-            tot_inv  = inventory_value_million(sub) if n else 0
-            tot_sp   = round(tot_inv / 1000, 3) if n else 0
+            tot_inv  = inventory_value_dollars(sub) if n else 0
+            tot_sp   = round(tot_inv, 0) if n else 0
             svc      = round(sub["Service Level (%)"].mean(), 0) if n else 0
             var      = round(sub["R8 Demand Variation (DSI)"].mean(), 1) if n else 0
             bg       = SEG_COLORS.get(seg, "#f5f5f5")
@@ -1155,8 +1154,8 @@ elif page == "📊 Dashboard 1":
                     </div>
                     <div class="seg-line"># of SKUs: <b>{n}/{n_total}</b> ({pct}%)</div>
                     <div class="seg-line">Total req qty: <b>{tot_qty:,.1f}MT</b></div>
-                    <div class="seg-line">Total inv: <b>{tot_inv:.2f}M$</b></div>
-                    <div class="seg-line">Total spend: <b>{tot_sp:.3f}M$</b></div>
+                    <div class="seg-line">Total inv: <b>$ {tot_inv:,.0f}</b></div>
+                    <div class="seg-line">Total spend: <b>$ {tot_sp:,.0f}</b></div>
                     <div class="seg-line">Service level: <b>{svc:.0f}%</b></div>
                     <div class="seg-line">Average variability: <b>{var:.1f}</b></div>
                 </div>""", unsafe_allow_html=True)
