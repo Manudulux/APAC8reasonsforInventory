@@ -468,8 +468,12 @@ with st.sidebar:
                 page = admin_page
 
             if st.button("Lock admin section", key="admin_lock_button"):
+                # Important: do NOT write to st.session_state["admin_navigation"] here.
+                # That key belongs to the Admin navigation radio widget. Streamlit
+                # raises StreamlitAPIException if a widget-backed session_state key
+                # is modified after the widget has been instantiated in the same run.
                 st.session_state["admin_unlocked"] = False
-                st.session_state["admin_navigation"] = "— Select admin page —"
+                page = dashboard_page
                 st.info("Admin section locked.")
 
     st.markdown("---")
