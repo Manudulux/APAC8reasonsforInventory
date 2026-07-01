@@ -438,15 +438,39 @@ with st.sidebar:
 
     st.markdown("---")
     with st.expander("🔐 For Admin only", expanded=False):
-        admin_page = st.radio("Admin navigation", [
-            "— Select admin page —",
-            "🔧 Global Settings",
-            "📂 Upload & Validate",
-            "⚙️ Intermediate File",
-            "📊 Final Output",
-        ], key="admin_navigation")
-        if admin_page != "— Select admin page —":
-            page = admin_page
+        if "admin_unlocked" not in st.session_state:
+            st.session_state["admin_unlocked"] = False
+
+        if not st.session_state["admin_unlocked"]:
+            admin_password = st.text_input(
+                "Admin password",
+                type="password",
+                key="admin_password_input",
+                help="Enter the admin password to access Global Settings, Upload & Validate, Intermediate File, and Final Output.",
+            )
+            if st.button("Unlock admin section", key="admin_unlock_button"):
+                if admin_password == "Aletheia":
+                    st.session_state["admin_unlocked"] = True
+                    st.success("Admin section unlocked.")
+                else:
+                    st.error("Incorrect password.")
+
+        if st.session_state["admin_unlocked"]:
+            st.caption("✅ Admin access unlocked")
+            admin_page = st.radio("Admin navigation", [
+                "— Select admin page —",
+                "🔧 Global Settings",
+                "📂 Upload & Validate",
+                "⚙️ Intermediate File",
+                "📊 Final Output",
+            ], key="admin_navigation")
+            if admin_page != "— Select admin page —":
+                page = admin_page
+
+            if st.button("Lock admin section", key="admin_lock_button"):
+                st.session_state["admin_unlocked"] = False
+                st.session_state["admin_navigation"] = "— Select admin page —"
+                st.info("Admin section locked.")
 
     st.markdown("---")
     st.markdown("**Pipeline status**")
