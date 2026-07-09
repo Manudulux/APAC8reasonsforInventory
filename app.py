@@ -1570,8 +1570,8 @@ elif page == "📈 Dashboard 3":
 
     # ── Avg 8 Reasons DSI waterfall ───────────────────────────────────────
     # Reflects the logic leading to Avg 8 Reasons (DSI):
-    #   Avg 8 Reasons (DSI) = Avg Cycle (DSI) + Avg Transit (DSI) + Avg Safety (DSI)
-    # All values use the same ADS-weighted-average logic as the KPI row.
+    #   Avg 8 Reasons (DSI) = Avg Cycle (DSI) + Avg R5 Geography (DSI) + Avg Safety (DSI)
+    # Transit Stock is intentionally R5, not the separate Transit (DSI) column.
     with c1:
         st.markdown("**Avg 8 Reasons DSI Waterfall**")
 
@@ -1597,7 +1597,9 @@ elif page == "📈 Dashboard 3":
         r8_avg = w_avg_raw(fdf3, "R8 Demand Variation (DSI)")
 
         cycle_avg_raw = w_avg_raw(fdf3, "Cycle (DSI)")
-        transit_avg_raw = w_avg_raw(fdf3, "Transit (DSI)")
+        # Business rule: Transit Stock in this waterfall is R5 Geography.
+        # Do not use the separate Transit (DSI) column here, because it can include other logic.
+        transit_avg_raw = r5_avg
         safety_avg_raw = w_avg_raw(fdf3, "Safety (DSI)")
         total_avg_raw = w_avg_raw(fdf3, "8 Reasons (DSI)")
 
@@ -1605,7 +1607,7 @@ elif page == "📈 Dashboard 3":
         reconciliation_raw = total_avg_raw - subtotal_raw
         illustrative_safety_from_avg_components = (r6_avg**2 + r7_avg**2 + r8_avg**2) ** 0.5
 
-        wf_labels = ["Cycle Stock", "Transit Stock", "Safety Stock"]
+        wf_labels = ["Cycle Stock", "Transit Stock = R5", "Safety Stock"]
         wf_values = [cycle_avg_raw, transit_avg_raw, safety_avg_raw]
         wf_measure = ["relative", "relative", "relative"]
 
@@ -1656,10 +1658,12 @@ elif page == "📈 Dashboard 3":
         with st.expander("🟠 Transit Stock — R5", expanded=True):
             st.markdown(f"""
             **Waterfall value:** `{transit_avg_raw:.2f} DSI`  
-            **Calculation used in the chart:** ADS-weighted average of the official **Transit (DSI)** field.
+            **Calculation used in the chart:** ADS-weighted average of **R5 Geography (DSI)**.
 
             **Input reason:**
             - **R5 Geography:** geography / lane / transit-time inventory required while material is in transit or constrained by supply route. Weighted average input: `{r5_avg:.2f} DSI`.
+
+            **Important:** This waterfall intentionally uses **R5 Geography (DSI)** as Transit Stock. It does **not** use the separate **Transit (DSI)** column, because that column may include additional output logic beyond R5.
             """)
 
         with st.expander("🔴 Safety Stock — R6 to R8", expanded=True):
@@ -1673,8 +1677,6 @@ elif page == "📈 Dashboard 3":
             - **R8 Demand Variation:** customer demand variability. Weighted average input: `{r8_avg:.2f} DSI`.
 
             **Safety-stock calculation logic:**  
-            Safety Stock is based on the root-sum-square approach:
-
             `Safety Stock = √(R6² + R7² + R8²)`
 
             **Illustration using the weighted-average displayed inputs:**  
@@ -1690,7 +1692,7 @@ elif page == "📈 Dashboard 3":
 
             **Component check:**
             - Cycle Stock: `{cycle_avg_raw:.2f} DSI`
-            - Transit Stock: `{transit_avg_raw:.2f} DSI`
+            - Transit Stock = R5: `{transit_avg_raw:.2f} DSI`
             - Safety Stock: `{safety_avg_raw:.2f} DSI`
             - Component sum: `{subtotal_raw:.2f} DSI`
             - Reconciliation to official Avg 8 Reasons DSI: `{reconciliation_raw:.2f} DSI`
@@ -2085,13 +2087,15 @@ elif page == "🔬 Dashboard 4":
     # ── 8 Reasons DSI waterfall ───────────────────────────────────────────────
     st.markdown("<div class='section-header'>📉 8 Reasons DSI Waterfall</div>", unsafe_allow_html=True)
 
-    # Reflects the actual logic leading to 8 Reasons (DSI):
-    #   8 Reasons (DSI) = Cycle (DSI) + Transit (DSI) + Safety (DSI)
-    wf_labels = ["Cycle Stock", "Transit Stock", "Safety Stock"]
-    wf_values = [cycle_dsi, transit_dsi, safety_dsi]
+    # Reflects the logic leading to 8 Reasons (DSI):
+    #   8 Reasons (DSI) = Cycle (DSI) + R5 Geography (DSI) + Safety (DSI)
+    # Transit Stock is intentionally R5, not the separate Transit (DSI) column.
+    wf_transit_dsi = r5
+    wf_labels = ["Cycle Stock", "Transit Stock = R5", "Safety Stock"]
+    wf_values = [cycle_dsi, wf_transit_dsi, safety_dsi]
     wf_measure = ["relative", "relative", "relative"]
 
-    reconciliation = total_dsi - (cycle_dsi + transit_dsi + safety_dsi)
+    reconciliation = total_dsi - (cycle_dsi + wf_transit_dsi + safety_dsi)
     illustrative_safety = (r6**2 + r7**2 + r8**2) ** 0.5
 
     if abs(reconciliation) >= 0.005:
@@ -2140,11 +2144,13 @@ elif page == "🔬 Dashboard 4":
 
     with st.expander("🟠 Transit Stock — R5", expanded=True):
         st.markdown(f"""
-        **Waterfall value:** `{transit_dsi:.2f} DSI`  
-        **Calculation used in the chart:** official **Transit (DSI)** from final output.
+        **Waterfall value:** `{wf_transit_dsi:.2f} DSI`  
+        **Calculation used in the chart:** **R5 Geography (DSI)**.
 
         **Input reason:**
         - **R5 Geography:** geography / lane / transit-time inventory required while material is in transit or constrained by supply route. Input: `{r5:.2f} DSI`.
+
+        **Check performed:** the previous version used **Transit (DSI)** here. This version uses **R5** directly, so Dashboard 4 is consistent with the Dashboard 3 waterfall business logic.
         """)
 
     with st.expander("🔴 Safety Stock — R6 to R8", expanded=True):
@@ -2158,8 +2164,6 @@ elif page == "🔬 Dashboard 4":
         - **R8 Demand Variation:** customer demand variability. Input: `{r8:.2f} DSI`.
 
         **Safety-stock calculation logic:**  
-        Safety Stock is based on the root-sum-square approach:
-
         `Safety Stock = √(R6² + R7² + R8²)`
 
         **Calculation using selected-material inputs:**  
@@ -2175,9 +2179,9 @@ elif page == "🔬 Dashboard 4":
 
         **Component check:**
         - Cycle Stock: `{cycle_dsi:.2f} DSI`
-        - Transit Stock: `{transit_dsi:.2f} DSI`
+        - Transit Stock = R5: `{wf_transit_dsi:.2f} DSI`
         - Safety Stock: `{safety_dsi:.2f} DSI`
-        - Component sum: `{(cycle_dsi + transit_dsi + safety_dsi):.2f} DSI`
+        - Component sum: `{(cycle_dsi + wf_transit_dsi + safety_dsi):.2f} DSI`
         - Reconciliation to official 8 Reasons DSI: `{reconciliation:.2f} DSI`
 
         A **Reconciliation** bar appears only when the official **8 Reasons (DSI)** value does not exactly equal the visible component sum, usually because of rounding or source-calculation differences.
@@ -2442,4 +2446,6 @@ elif page == "🔬 Dashboard 4":
         pd.DataFrame(param_data).style.format({"Value": lambda v: f"{v:,.3f}" if isinstance(v, float) else v}),
         use_container_width=True, height=680
     )
+
+
 
