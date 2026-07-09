@@ -1489,20 +1489,43 @@ elif page == "📈 Dashboard 3":
 
     c1, c2 = st.columns(2)
 
-    # ── R1–R8 average DSI horizontal bar ──────────────────────────────────
+    # ── R1–R8 weighted-average waterfall breakdown ─────────────────────────
+    # Mirrors Dashboard 4's R1–R8 waterfall, but uses the Dashboard 3 filtered
+    # population and weighted-average DSI values instead of a single material.
     with c1:
-        st.markdown("**Average R1–R8 DSI Contribution**")
-        avgs = [w_avg(fdf3, c) for c in R_COLS]
-        fig1 = go.Figure(go.Bar(
-            y=R_LABELS, x=avgs, orientation="h",
-            marker_color=R_COLORS,
-            text=[f"{v:.2f}" for v in avgs], textposition="outside"
+        st.markdown("**R1–R8 Waterfall Breakdown**")
+
+        r_vals = [w_avg(fdf3, c) for c in R_COLS]
+        r1, r2, r3, r4, r5, r6, r7, r8 = r_vals
+        cycle_dsi   = w_avg(fdf3, "Cycle (DSI)")
+        transit_dsi = w_avg(fdf3, "Transit (DSI)")
+        safety_dsi  = w_avg(fdf3, "Safety (DSI)")
+        total_dsi   = w_avg(fdf3, "8 Reasons (DSI)")
+
+        wf_labels  = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
+                      "= Cycle", "R5 Geography", "= Transit", "R6 Ship Var", "R7 Supply Var",
+                      "R8 Demand Var", "= Safety", "TOTAL"]
+        wf_vals    = [r1, r2, r3, r4, cycle_dsi, r5, transit_dsi, r6, r7, r8, safety_dsi, total_dsi]
+        wf_measure = ["relative", "relative", "relative", "relative", "total",
+                      "relative", "total", "relative", "relative", "relative", "total", "total"]
+
+        fig1 = go.Figure(go.Waterfall(
+            name="DSI", orientation="v",
+            measure=wf_measure, x=wf_labels, y=wf_vals,
+            text=[f"{v:.2f}" for v in wf_vals],
+            textposition="outside",
+            connector=dict(line=dict(color="#e2e8f0", width=1, dash="dot")),
+            increasing=dict(marker=dict(color="#3b82f6")),
+            decreasing=dict(marker=dict(color="#f59e0b")),
+            totals=dict(marker=dict(color="#0a192f")),
         ))
         fig1.update_layout(
-            margin=dict(l=10,r=60,t=10,b=10), height=320,
+            height=380, margin=dict(l=10, r=10, t=20, b=10),
             plot_bgcolor="white", paper_bgcolor="white",
-            xaxis=dict(gridcolor="#e9ecef", title="DSI (days)"),
-            yaxis=dict(tickfont=dict(size=11))
+            yaxis=dict(gridcolor="#f1f5f9", title="DSI (Days of Supply Inventory)"),
+            xaxis=dict(tickfont=dict(size=10, family="IBM Plex Mono")),
+            font=dict(family="IBM Plex Sans"),
+            showlegend=False,
         )
         st.plotly_chart(fig1, use_container_width=True)
 
@@ -2181,4 +2204,6 @@ elif page == "🔬 Dashboard 4":
         pd.DataFrame(param_data).style.format({"Value": lambda v: f"{v:,.3f}" if isinstance(v, float) else v}),
         use_container_width=True, height=680
     )
+
+
 
