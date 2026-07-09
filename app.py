@@ -1574,7 +1574,7 @@ elif page == "📈 Dashboard 3":
     #   R5 is displayed from the Cycle subtotal
     #   R6-R8 are displayed from Cycle + R5
     #   Safety subtotal starts at Cycle + R5 and has height R6 + R7 + R8
-    #   Total  = Cycle + R5 + Safety
+    #   Total  = R1 + R2 + R3 + R4 + R5 + R6 + R7 + R8
     with c1:
         st.markdown("**R1–R8 Waterfall Breakdown**")
 
@@ -1583,7 +1583,7 @@ elif page == "📈 Dashboard 3":
         cycle_dsi = round(r1 + r2 + r3 + r4, 2)
         safety_dsi = round(r6 + r7 + r8, 2)
         cycle_r5_dsi = round(cycle_dsi + r5, 2)
-        total_dsi = round(cycle_r5_dsi + safety_dsi, 2)
+        total_dsi = round(r1 + r2 + r3 + r4 + r5 + r6 + r7 + r8, 2)
 
         wf_labels = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
                      "= Cycle", "R5 Geography", "R6 Ship Var", "R7 Supply Var",
@@ -1593,7 +1593,8 @@ elif page == "📈 Dashboard 3":
                    f"{r5:.2f}", f"{r6:.2f}", f"{r7:.2f}", f"{r8:.2f}",
                    f"{safety_dsi:.2f}", f"{total_dsi:.2f}"]
         # Floating-bar bases make each reason start from the previous subtotal/running level.
-        # The Safety subtotal is intentionally floating from Cycle + R5, not from zero.
+        # Safety is intentionally a floating subtotal from Cycle + R5.
+        # TOTAL is anchored at zero and explicitly equals the sum of R1 through R8.
         wf_bases = [0, r1, r1 + r2, r1 + r2 + r3, 0,
                     cycle_dsi,
                     cycle_r5_dsi, cycle_r5_dsi + r6, cycle_r5_dsi + r6 + r7,
@@ -2012,11 +2013,11 @@ elif page == "🔬 Dashboard 4":
     #   R5 is displayed from the Cycle subtotal
     #   R6-R8 are displayed from Cycle + R5
     #   Safety subtotal starts at Cycle + R5 and has height R6 + R7 + R8
-    #   Total  = Cycle + R5 + Safety
+    #   Total  = R1 + R2 + R3 + R4 + R5 + R6 + R7 + R8
     wf_cycle_dsi = round(r1 + r2 + r3 + r4, 2)
     wf_safety_dsi = round(r6 + r7 + r8, 2)
     wf_cycle_r5_dsi = round(wf_cycle_dsi + r5, 2)
-    wf_total_dsi = round(wf_cycle_r5_dsi + wf_safety_dsi, 2)
+    wf_total_dsi = round(r1 + r2 + r3 + r4 + r5 + r6 + r7 + r8, 2)
 
     wf_labels = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
                  "= Cycle", "R5 Geography", "R6 Ship Var", "R7 Supply Var",
@@ -2026,7 +2027,8 @@ elif page == "🔬 Dashboard 4":
                f"{r5:.2f}", f"{r6:.2f}", f"{r7:.2f}", f"{r8:.2f}",
                f"{wf_safety_dsi:.2f}", f"{wf_total_dsi:.2f}"]
     # Floating-bar bases make each reason start from the previous subtotal/running level.
-    # The Safety subtotal is intentionally floating from Cycle + R5, not from zero.
+    # Safety is intentionally a floating subtotal from Cycle + R5.
+    # TOTAL is anchored at zero and explicitly equals the sum of R1 through R8.
     wf_bases = [0, r1, r1 + r2, r1 + r2 + r3, 0,
                 wf_cycle_dsi,
                 wf_cycle_r5_dsi, wf_cycle_r5_dsi + r6, wf_cycle_r5_dsi + r6 + r7,
@@ -2312,4 +2314,6 @@ elif page == "🔬 Dashboard 4":
         pd.DataFrame(param_data).style.format({"Value": lambda v: f"{v:,.3f}" if isinstance(v, float) else v}),
         use_container_width=True, height=680
     )
+
+
 
