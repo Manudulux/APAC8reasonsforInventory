@@ -8,7 +8,7 @@ from io import BytesIO
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="8 Reasons Inventory Tool – Goodyear",
-    page_icon="🔴",
+    page_icon="",
     layout="wide",
 )
 
@@ -1559,6 +1559,7 @@ elif page == "📈 Dashboard 3":
         safety_avg_raw = w_avg_raw(fdf3, "Safety (DSI)")
         total_avg_raw = w_avg_raw(fdf3, "8 Reasons (DSI)")
         component_sum_raw = cycle_avg_raw + transit_avg_raw + safety_avg_raw
+        illustrative_cycle_max = max(r1_avg, r2_avg, r3_avg, r4_avg)
         illustrative_safety = (r6_avg**2 + r7_avg**2 + r8_avg**2) ** 0.5
 
         wf_labels = ["Cycle Stock", "Transit Stock", "Safety Stock", "Avg 8 Reasons DSI"]
@@ -1588,13 +1589,19 @@ elif page == "📈 Dashboard 3":
             **Waterfall value:** `{cycle_avg_raw:.2f} DSI`  
             **Calculation used in the chart:** ADS-weighted average of the official **Cycle (DSI)** output field.
 
+            **Cycle-stock business logic:**  
+            `Cycle Stock = Max(R1, R2, R3, R4)`
+
             **Input reasons shown one per line:**
             - **R1 Information Cycle:** review / order-cycle stock. Weighted average input: `{r1_avg:.2f} DSI`.
             - **R2 Manufacturing Lot Size:** manufacturing batch / lot-size stock. Weighted average input: `{r2_avg:.2f} DSI`.
             - **R3 Shipping Lot Size:** shipment batch / container / shipping-lot stock. Weighted average input: `{r3_avg:.2f} DSI`.
             - **R4 Shipping Interval:** stock required between shipment opportunities. Weighted average input: `{r4_avg:.2f} DSI`.
 
-            The official **Cycle (DSI)** output is the basis for the waterfall, so any cycle-stock methodology already applied by the engine is preserved.
+            **Illustration using displayed weighted-average inputs:**  
+            `Max({r1_avg:.2f}, {r2_avg:.2f}, {r3_avg:.2f}, {r4_avg:.2f}) = {illustrative_cycle_max:.2f} DSI`
+
+            The official **Cycle (DSI)** output is the basis for the waterfall, so any row-level cycle-stock methodology already applied by the calculation engine is preserved.
             """)
 
         with st.expander("🟠 Transit Stock — official Transit (DSI)", expanded=True):
@@ -1605,7 +1612,7 @@ elif page == "📈 Dashboard 3":
             **Input reason shown one per line:**
             - **R5 Geography:** geography / lane / transit-time inventory. Weighted average input: `{r5_avg:.2f} DSI`.
 
-            **Important:** the waterfall now uses the official **Transit (DSI)** output value, not R5 alone. This preserves any extra transit logic applied by the final output calculation.
+            **Important:** the waterfall uses the official **Transit (DSI)** output value, not R5 alone. This preserves any extra transit logic applied by the final output calculation.
             """)
 
         with st.expander("🔴 Safety Stock — R6 to R8", expanded=True):
@@ -1613,18 +1620,18 @@ elif page == "📈 Dashboard 3":
             **Waterfall value:** `{safety_avg_raw:.2f} DSI`  
             **Calculation used in the chart:** ADS-weighted average of the official **Safety (DSI)** output field.
 
+            **Safety-stock business logic:**  
+            `Safety Stock = √(R6² + R7² + R8²)`
+
             **Input reasons shown one per line:**
             - **R6 Shipping Variation:** shipping / lead-time variability. Weighted average input: `{r6_avg:.2f} DSI`.
             - **R7 Supply Variation:** supplier / supply reliability variability. Weighted average input: `{r7_avg:.2f} DSI`.
             - **R8 Demand Variation:** customer demand variability. Weighted average input: `{r8_avg:.2f} DSI`.
 
-            **Safety-stock calculation logic:**  
-            `Safety Stock = √(R6² + R7² + R8²)`
-
             **Illustration using displayed weighted-average inputs:**  
             `√({r6_avg:.2f}² + {r7_avg:.2f}² + {r8_avg:.2f}²) = {illustrative_safety:.2f} DSI`
 
-            The official **Safety (DSI)** output is the waterfall basis, so any row-level or capped safety-stock logic already applied by the engine is preserved.
+            The official **Safety (DSI)** output is the waterfall basis, so any row-level or capped safety-stock logic already applied by the calculation engine is preserved.
             """)
 
         with st.expander("⚫ Total check", expanded=True):
@@ -2036,6 +2043,7 @@ elif page == "🔬 Dashboard 4":
     wf_values = [cycle_dsi, transit_dsi, safety_dsi, total_dsi]
     wf_measure = ["relative", "relative", "relative", "total"]
     component_sum = cycle_dsi + transit_dsi + safety_dsi
+    illustrative_cycle_max = max(r1, r2, r3, r4)
     illustrative_safety = (r6**2 + r7**2 + r8**2) ** 0.5
 
     fig_wf = go.Figure(go.Waterfall(
@@ -2059,10 +2067,17 @@ elif page == "🔬 Dashboard 4":
         **Waterfall value:** `{cycle_dsi:.2f} DSI`  
         **Calculation used in the chart:** official **Cycle (DSI)** from final output.
 
+        **Cycle-stock business logic:**  
+        `Cycle Stock = Max(R1, R2, R3, R4)`
+
+        **Input reasons shown one per line:**
         - **R1 Information Cycle:** review / order-cycle stock. Input: `{r1:.2f} DSI`.
         - **R2 Manufacturing Lot Size:** manufacturing batch / lot-size stock. Input: `{r2:.2f} DSI`.
         - **R3 Shipping Lot Size:** shipment batch / container / shipping-lot stock. Input: `{r3:.2f} DSI`.
         - **R4 Shipping Interval:** stock required between shipment opportunities. Input: `{r4:.2f} DSI`.
+
+        **Calculation from selected-material inputs:**  
+        `Max({r1:.2f}, {r2:.2f}, {r3:.2f}, {r4:.2f}) = {illustrative_cycle_max:.2f} DSI`
         """)
     with st.expander("🟠 Transit Stock — official Transit (DSI)", expanded=True):
         st.markdown(f"""
@@ -2071,19 +2086,23 @@ elif page == "🔬 Dashboard 4":
 
         - **R5 Geography:** geography / lane / transit-time inventory. Input: `{r5:.2f} DSI`.
 
-        **Important:** the waterfall now uses the official **Transit (DSI)** output value, not R5 alone. This preserves any extra transit logic applied by the final output calculation.
+        **Important:** the waterfall uses the official **Transit (DSI)** output value, not R5 alone. This preserves any extra transit logic applied by the final output calculation.
         """)
     with st.expander("🔴 Safety Stock — R6 to R8", expanded=True):
         st.markdown(f"""
         **Waterfall value:** `{safety_dsi:.2f} DSI`  
         **Calculation used in the chart:** official **Safety (DSI)** from final output.
 
+        **Safety-stock business logic:**  
+        `Safety Stock = √(R6² + R7² + R8²)`
+
+        **Input reasons shown one per line:**
         - **R6 Shipping Variation:** shipping / lead-time variability. Input: `{r6:.2f} DSI`.
         - **R7 Supply Variation:** supplier / supply reliability variability. Input: `{r7:.2f} DSI`.
         - **R8 Demand Variation:** customer demand variability. Input: `{r8:.2f} DSI`.
 
-        `Safety Stock = √(R6² + R7² + R8²)`  
-        Illustration from selected-material inputs: `√({r6:.2f}² + {r7:.2f}² + {r8:.2f}²) = {illustrative_safety:.2f} DSI`.
+        **Calculation from selected-material inputs:**  
+        `√({r6:.2f}² + {r7:.2f}² + {r8:.2f}²) = {illustrative_safety:.2f} DSI`
         """)
     with st.expander("⚫ Total check", expanded=True):
         st.markdown(f"""
