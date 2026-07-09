@@ -1568,69 +1568,61 @@ elif page == "📈 Dashboard 3":
 
     c1, c2 = st.columns(2)
 
-    # ── R1–R8 weighted-average bridge / waterfall breakdown ────────────────
-    # Same visual logic as Dashboard 4, adapted to Dashboard 3 filters.
-    # Important: because max() and sqrt() are non-linear, Dashboard 3 aggregates
-    # the row-level Cycle/Safety logic using the same weighted-average basis as
-    # the KPI row. The waterfall TOTAL is taken from 8 Reasons (DSI), so it
-    # matches Avg 8 Reasons (DSI).
+    # ── Avg 8 Reasons DSI waterfall ───────────────────────────────────────
+    # Restarted from scratch to reflect the actual logic leading to Avg 8 Reasons (DSI):
+    #   Avg 8 Reasons (DSI) = Avg Cycle (DSI) + Avg Transit (DSI) + Avg Safety (DSI)
+    # All values use the same ADS-weighted-average logic as the KPI row.
     with c1:
-        st.markdown("**R1–R8 Waterfall Breakdown**")
+        st.markdown("**Avg 8 Reasons DSI Waterfall**")
 
-        def w_avg_series(df, values):
-            """Weighted average of a calculated row-level Series by Average Daily Sales."""
-            if df.empty or ads not in df.columns:
+        def w_avg_raw(df, col):
+            """Unrounded weighted average using Average Daily Sales, matching Dashboard 3 KPI logic."""
+            if df.empty or ads not in df.columns or col not in df.columns:
                 return 0.0
-            vals = pd.to_numeric(values, errors="coerce").fillna(0)
+            values = pd.to_numeric(df[col], errors="coerce").fillna(0)
             weights = pd.to_numeric(df[ads], errors="coerce").fillna(0)
             denom = weights.sum()
             if denom == 0:
-                return round(float(vals.mean()), 2) if len(vals) else 0.0
-            return round(float((vals * weights).sum() / denom), 2)
+                return float(values.mean()) if len(values) else 0.0
+            return float((values * weights).sum() / denom)
 
-        # Display weighted-average R1-R8 source components.
-        r_vals = [w_avg(fdf3, c) for c in R_COLS]
-        r1, r2, r3, r4, r5, r6, r7, r8 = r_vals
+        cycle_avg_raw  = w_avg_raw(fdf3, "Cycle (DSI)")
+        transit_avg_raw = w_avg_raw(fdf3, "Transit (DSI)")
+        safety_avg_raw = w_avg_raw(fdf3, "Safety (DSI)")
+        total_avg_raw  = w_avg_raw(fdf3, "8 Reasons (DSI)")
 
-        # Aggregate using row-level Dashboard 4 logic, not max/sqrt of aggregate averages.
-        r_num = fdf3[R_COLS].apply(pd.to_numeric, errors="coerce").fillna(0)
-        row_cycle = r_num[R_COLS[:4]].max(axis=1)
-        row_transit = r_num[R_COLS[4]]
-        row_safety = (r_num[R_COLS[5]]**2 + r_num[R_COLS[6]]**2 + r_num[R_COLS[7]]**2) ** 0.5
-        row_total = row_cycle + row_transit + row_safety
+        subtotal_raw = cycle_avg_raw + transit_avg_raw + safety_avg_raw
+        reconciliation_raw = total_avg_raw - subtotal_raw
 
-        cycle_dsi = w_avg_series(fdf3, row_cycle)
-        transit_dsi = w_avg_series(fdf3, row_transit)
-        safety_dsi = w_avg_series(fdf3, row_safety)
-        calculated_total_dsi = w_avg_series(fdf3, row_total)
-        # Match the KPI exactly when the final output already provides 8 Reasons (DSI).
-        total_dsi = w_avg(fdf3, "8 Reasons (DSI)") if "8 Reasons (DSI)" in fdf3.columns else calculated_total_dsi
-        transit_top_dsi = round(cycle_dsi + transit_dsi, 2)
+        wf_labels  = ["Cycle Stock", "Transit Stock", "Safety Stock"]
+        wf_values  = [cycle_avg_raw, transit_avg_raw, safety_avg_raw]
+        wf_measure = ["relative", "relative", "relative"]
+        wf_colors  = ["#1d4ed8", "#f97316", "#dc2626"]
 
-        wf_labels = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
-                     "= Cycle Stock", "R5 Transit Stock", "R6 Ship Var", "R7 Supply Var",
-                     "R8 Demand Var", "= Safety Stock", "TOTAL"]
-        wf_values = [r1, r2, r3, r4, cycle_dsi, transit_dsi, r6, r7, r8, safety_dsi, total_dsi]
-        wf_text = [f"{r1:.2f}", f"{r2:.2f}", f"{r3:.2f}", f"{r4:.2f}", f"{cycle_dsi:.2f}",
-                   f"{transit_dsi:.2f}", f"{r6:.2f}", f"{r7:.2f}", f"{r8:.2f}",
-                   f"{safety_dsi:.2f}", f"{total_dsi:.2f}"]
-        wf_bases = [0, 0, 0, 0,
-                    0,
-                    cycle_dsi,
-                    transit_top_dsi, transit_top_dsi + r6, transit_top_dsi + r6 + r7,
-                    transit_top_dsi,
-                    0]
-        wf_colors = ["#3b82f6", "#3b82f6", "#3b82f6", "#3b82f6", "#1d4ed8",
-                     "#f97316", "#ef4444", "#ef4444", "#ef4444",
-                     "#dc2626", "#0a192f"]
+        # Keep the chart reconciled to the KPI even if the source workbook has tiny rounding
+        # or calculation differences between component columns and 8 Reasons (DSI).
+        if abs(reconciliation_raw) >= 0.005:
+            wf_labels.append("Reconciliation")
+            wf_values.append(reconciliation_raw)
+            wf_measure.append("relative")
+            wf_colors.append("#64748b")
 
-        fig1 = go.Figure(go.Bar(
-            x=wf_labels, y=wf_values, base=wf_bases,
-            marker_color=wf_colors,
-            text=wf_text,
+        wf_labels.append("Avg 8 Reasons DSI")
+        wf_values.append(total_avg_raw)
+        wf_measure.append("total")
+        wf_colors.append("#0a192f")
+
+        fig1 = go.Figure(go.Waterfall(
+            name="DSI", orientation="v",
+            measure=wf_measure, x=wf_labels, y=wf_values,
+            text=[f"{v:.2f}" for v in wf_values],
             textposition="outside",
-            hovertemplate="%{x}<br>Value: %{y:.2f} DSI<br>Starts at: %{base:.2f} DSI<extra></extra>",
+            connector=dict(line=dict(color="#e2e8f0", width=1, dash="dot")),
+            increasing=dict(marker=dict(color="#3b82f6")),
+            decreasing=dict(marker=dict(color="#f59e0b")),
+            totals=dict(marker=dict(color="#0a192f")),
         ))
+        fig1.update_traces(marker={"color": wf_colors})
         fig1.update_layout(
             height=380, margin=dict(l=10, r=10, t=20, b=10),
             plot_bgcolor="white", paper_bgcolor="white",
@@ -1640,7 +1632,12 @@ elif page == "📈 Dashboard 3":
             showlegend=False,
         )
         st.plotly_chart(fig1, use_container_width=True)
-        st.caption("Waterfall logic: Cycle Stock = weighted average of row-level max(R1, R2, R3, R4); Transit Stock = weighted average of R5 and starts at the Cycle Stock level; R6 starts at the top of Transit Stock; Safety Stock = weighted average of row-level √(R6² + R7² + R8²) and starts at the top of Transit Stock; Total matches Avg 8 Reasons (DSI).")
+        st.caption(
+            "Waterfall logic: Avg 8 Reasons (DSI) is built from the same ADS-weighted averages used in the KPI: "
+            "Cycle Stock + Transit Stock + Safety Stock. Cycle Stock groups R1-R4, Transit Stock corresponds to R5, "
+            "and Safety Stock groups R6-R8. A small Reconciliation bar is shown only if the workbook's 8 Reasons (DSI) "
+            "does not exactly equal the sum of the three components due to rounding or source-calculation differences."
+        )
 
     # ── Stacked DSI by INCO term ──────────────────────────────────────────
     with c2:
@@ -2026,45 +2023,39 @@ elif page == "🔬 Dashboard 4":
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Corrected bridge / waterfall chart ───────────────────────────────────
-    st.markdown("<div class='section-header'>📉 R1–R8 Waterfall Breakdown</div>", unsafe_allow_html=True)
+    # ── 8 Reasons DSI waterfall ───────────────────────────────────────────────
+    st.markdown("<div class='section-header'>📉 8 Reasons DSI Waterfall</div>", unsafe_allow_html=True)
 
-    # Same row-level logic used for Dashboard 3, applied to the selected material:
-    #   Cycle Stock   = max(R1, R2, R3, R4)
-    #   Transit Stock = R5, displayed from the Cycle Stock subtotal level
-    #   R6 starts from the top of Transit Stock; R7 and R8 continue from there
-    #   Safety Stock  = sqrt(R6² + R7² + R8²), displayed from the top of Transit Stock
-    #   TOTAL uses the official 8 Reasons (DSI) field so it matches the KPI/output value.
-    wf_cycle_dsi = round(max(r1, r2, r3, r4), 2)
-    wf_transit_dsi = round(r5, 2)
-    wf_safety_dsi = round((r6**2 + r7**2 + r8**2) ** 0.5, 2)
-    wf_total_dsi = round(total_dsi, 2)
-    wf_transit_top_dsi = round(wf_cycle_dsi + wf_transit_dsi, 2)
+    # Restarted from scratch to reflect the actual logic leading to 8 Reasons (DSI):
+    #   8 Reasons (DSI) = Cycle (DSI) + Transit (DSI) + Safety (DSI)
+    wf_labels  = ["Cycle Stock", "Transit Stock", "Safety Stock"]
+    wf_values  = [cycle_dsi, transit_dsi, safety_dsi]
+    wf_measure = ["relative", "relative", "relative"]
+    wf_colors  = ["#1d4ed8", "#f97316", "#dc2626"]
 
-    wf_labels = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
-                 "= Cycle Stock", "R5 Transit Stock", "R6 Ship Var", "R7 Supply Var",
-                 "R8 Demand Var", "= Safety Stock", "TOTAL"]
-    wf_values = [r1, r2, r3, r4, wf_cycle_dsi, wf_transit_dsi, r6, r7, r8, wf_safety_dsi, wf_total_dsi]
-    wf_text = [f"{r1:.2f}", f"{r2:.2f}", f"{r3:.2f}", f"{r4:.2f}", f"{wf_cycle_dsi:.2f}",
-               f"{wf_transit_dsi:.2f}", f"{r6:.2f}", f"{r7:.2f}", f"{r8:.2f}",
-               f"{wf_safety_dsi:.2f}", f"{wf_total_dsi:.2f}"]
-    wf_bases = [0, 0, 0, 0,
-                0,
-                wf_cycle_dsi,
-                wf_transit_top_dsi, wf_transit_top_dsi + r6, wf_transit_top_dsi + r6 + r7,
-                wf_transit_top_dsi,
-                0]
-    wf_colors = ["#3b82f6", "#3b82f6", "#3b82f6", "#3b82f6", "#1d4ed8",
-                 "#f97316", "#ef4444", "#ef4444", "#ef4444",
-                 "#dc2626", "#0a192f"]
+    reconciliation = total_dsi - (cycle_dsi + transit_dsi + safety_dsi)
+    if abs(reconciliation) >= 0.005:
+        wf_labels.append("Reconciliation")
+        wf_values.append(reconciliation)
+        wf_measure.append("relative")
+        wf_colors.append("#64748b")
 
-    fig_wf = go.Figure(go.Bar(
-        x=wf_labels, y=wf_values, base=wf_bases,
-        marker_color=wf_colors,
-        text=wf_text,
+    wf_labels.append("8 Reasons DSI")
+    wf_values.append(total_dsi)
+    wf_measure.append("total")
+    wf_colors.append("#0a192f")
+
+    fig_wf = go.Figure(go.Waterfall(
+        name="DSI", orientation="v",
+        measure=wf_measure, x=wf_labels, y=wf_values,
+        text=[f"{v:.2f}" for v in wf_values],
         textposition="outside",
-        hovertemplate="%{x}<br>Value: %{y:.2f} DSI<br>Starts at: %{base:.2f} DSI<extra></extra>",
+        connector=dict(line=dict(color="#e2e8f0", width=1, dash="dot")),
+        increasing=dict(marker=dict(color="#3b82f6")),
+        decreasing=dict(marker=dict(color="#f59e0b")),
+        totals=dict(marker=dict(color="#0a192f")),
     ))
+    fig_wf.update_traces(marker={"color": wf_colors})
     fig_wf.update_layout(
         height=380, margin=dict(l=10,r=10,t=20,b=10),
         plot_bgcolor="white", paper_bgcolor="white",
@@ -2074,7 +2065,12 @@ elif page == "🔬 Dashboard 4":
         showlegend=False,
     )
     st.plotly_chart(fig_wf, use_container_width=True)
-    st.caption("Waterfall logic: Cycle Stock = max(R1, R2, R3, R4); Transit Stock = R5 and starts at the Cycle Stock level; R6 starts at the top of Transit Stock; Safety Stock = √(R6² + R7² + R8²) and starts at the top of Transit Stock; Total uses the official 8 Reasons (DSI) value.")
+    st.caption(
+        "Waterfall logic: 8 Reasons (DSI) is built from Cycle Stock + Transit Stock + Safety Stock. "
+        "Cycle Stock groups R1-R4, Transit Stock corresponds to R5, and Safety Stock groups R6-R8. "
+        "A small Reconciliation bar is shown only if the official 8 Reasons (DSI) value does not exactly equal "
+        "the sum of the three components due to rounding or source-calculation differences."
+    )
 
     # ── R1–R8 detailed cards ──────────────────────────────────────────────────
     st.markdown("<div class='section-header'>📋 Detailed R1–R8 Calculations</div>", unsafe_allow_html=True)
@@ -2335,5 +2331,4 @@ elif page == "🔬 Dashboard 4":
         pd.DataFrame(param_data).style.format({"Value": lambda v: f"{v:,.3f}" if isinstance(v, float) else v}),
         use_container_width=True, height=680
     )
-
 
