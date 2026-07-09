@@ -1586,18 +1586,17 @@ elif page == "📈 Dashboard 3":
                 return float(values.mean()) if len(values) else 0.0
             return float((values * weights).sum() / denom)
 
-        cycle_avg_raw  = w_avg_raw(fdf3, "Cycle (DSI)")
+        cycle_avg_raw = w_avg_raw(fdf3, "Cycle (DSI)")
         transit_avg_raw = w_avg_raw(fdf3, "Transit (DSI)")
         safety_avg_raw = w_avg_raw(fdf3, "Safety (DSI)")
-        total_avg_raw  = w_avg_raw(fdf3, "8 Reasons (DSI)")
+        total_avg_raw = w_avg_raw(fdf3, "8 Reasons (DSI)")
 
         subtotal_raw = cycle_avg_raw + transit_avg_raw + safety_avg_raw
         reconciliation_raw = total_avg_raw - subtotal_raw
 
-        wf_labels  = ["Cycle Stock", "Transit Stock", "Safety Stock"]
-        wf_values  = [cycle_avg_raw, transit_avg_raw, safety_avg_raw]
+        wf_labels = ["Cycle Stock", "Transit Stock", "Safety Stock"]
+        wf_values = [cycle_avg_raw, transit_avg_raw, safety_avg_raw]
         wf_measure = ["relative", "relative", "relative"]
-        wf_colors  = ["#1d4ed8", "#f97316", "#dc2626"]
 
         # Keep the chart reconciled to the KPI even if the source workbook has tiny rounding
         # or calculation differences between component columns and 8 Reasons (DSI).
@@ -1605,12 +1604,10 @@ elif page == "📈 Dashboard 3":
             wf_labels.append("Reconciliation")
             wf_values.append(reconciliation_raw)
             wf_measure.append("relative")
-            wf_colors.append("#64748b")
 
         wf_labels.append("Avg 8 Reasons DSI")
         wf_values.append(total_avg_raw)
         wf_measure.append("total")
-        wf_colors.append("#0a192f")
 
         fig1 = go.Figure(go.Waterfall(
             name="DSI", orientation="v",
@@ -1622,7 +1619,6 @@ elif page == "📈 Dashboard 3":
             decreasing=dict(marker=dict(color="#f59e0b")),
             totals=dict(marker=dict(color="#0a192f")),
         ))
-        fig1.update_traces(marker={"color": wf_colors})
         fig1.update_layout(
             height=380, margin=dict(l=10, r=10, t=20, b=10),
             plot_bgcolor="white", paper_bgcolor="white",
@@ -2028,22 +2024,19 @@ elif page == "🔬 Dashboard 4":
 
     # Restarted from scratch to reflect the actual logic leading to 8 Reasons (DSI):
     #   8 Reasons (DSI) = Cycle (DSI) + Transit (DSI) + Safety (DSI)
-    wf_labels  = ["Cycle Stock", "Transit Stock", "Safety Stock"]
-    wf_values  = [cycle_dsi, transit_dsi, safety_dsi]
+    wf_labels = ["Cycle Stock", "Transit Stock", "Safety Stock"]
+    wf_values = [cycle_dsi, transit_dsi, safety_dsi]
     wf_measure = ["relative", "relative", "relative"]
-    wf_colors  = ["#1d4ed8", "#f97316", "#dc2626"]
 
     reconciliation = total_dsi - (cycle_dsi + transit_dsi + safety_dsi)
     if abs(reconciliation) >= 0.005:
         wf_labels.append("Reconciliation")
         wf_values.append(reconciliation)
         wf_measure.append("relative")
-        wf_colors.append("#64748b")
 
     wf_labels.append("8 Reasons DSI")
     wf_values.append(total_dsi)
     wf_measure.append("total")
-    wf_colors.append("#0a192f")
 
     fig_wf = go.Figure(go.Waterfall(
         name="DSI", orientation="v",
@@ -2055,7 +2048,6 @@ elif page == "🔬 Dashboard 4":
         decreasing=dict(marker=dict(color="#f59e0b")),
         totals=dict(marker=dict(color="#0a192f")),
     ))
-    fig_wf.update_traces(marker={"color": wf_colors})
     fig_wf.update_layout(
         height=380, margin=dict(l=10,r=10,t=20,b=10),
         plot_bgcolor="white", paper_bgcolor="white",
@@ -2331,6 +2323,4 @@ elif page == "🔬 Dashboard 4":
         pd.DataFrame(param_data).style.format({"Value": lambda v: f"{v:,.3f}" if isinstance(v, float) else v}),
         use_container_width=True, height=680
     )
-
-
 
