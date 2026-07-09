@@ -1603,6 +1603,7 @@ elif page == "📈 Dashboard 3":
 
         subtotal_raw = cycle_avg_raw + transit_avg_raw + safety_avg_raw
         reconciliation_raw = total_avg_raw - subtotal_raw
+        illustrative_safety_from_avg_components = (r6_avg**2 + r7_avg**2 + r8_avg**2) ** 0.5
 
         wf_labels = ["Cycle Stock", "Transit Stock", "Safety Stock"]
         wf_values = [cycle_avg_raw, transit_avg_raw, safety_avg_raw]
@@ -1646,26 +1647,30 @@ elif page == "📈 Dashboard 3":
         component_detail = pd.DataFrame([
             {
                 "Stock bucket": "Cycle Stock",
+                "Reason descriptions": "R1 Information Cycle = review/order cycle stock; R2 Manufacturing Lot Size = manufacturing batch/lot stock; R3 Shipping Lot Size = shipment batch/lot stock; R4 Shipping Interval = stock required between shipments.",
                 "Inputs visualised": f"R1={r1_avg:.2f}, R2={r2_avg:.2f}, R3={r3_avg:.2f}, R4={r4_avg:.2f}",
-                "Calculation shown in waterfall": "ADS-weighted average of Cycle (DSI)",
+                "Detailed calculation": f"Waterfall uses ADS-weighted average of official Cycle (DSI): {cycle_avg_raw:.2f}. R1-R4 are shown as input drivers; the official Cycle (DSI) column already applies the app's cycle-stock calculation methodology.",
                 "Waterfall value (DSI)": round(cycle_avg_raw, 2),
             },
             {
                 "Stock bucket": "Transit Stock",
+                "Reason descriptions": "R5 Geography = geography / transit-time inventory required while material is in transit or constrained by supply lane geography.",
                 "Inputs visualised": f"R5={r5_avg:.2f}",
-                "Calculation shown in waterfall": "ADS-weighted average of Transit (DSI)",
+                "Detailed calculation": f"Waterfall uses ADS-weighted average of official Transit (DSI): {transit_avg_raw:.2f}. R5 is the input driver for Transit Stock.",
                 "Waterfall value (DSI)": round(transit_avg_raw, 2),
             },
             {
                 "Stock bucket": "Safety Stock",
+                "Reason descriptions": "R6 Shipping Variation = shipping/lead-time variability; R7 Supply Variation = supply reliability variability; R8 Demand Variation = demand variability.",
                 "Inputs visualised": f"R6={r6_avg:.2f}, R7={r7_avg:.2f}, R8={r8_avg:.2f}",
-                "Calculation shown in waterfall": "ADS-weighted average of Safety (DSI)",
+                "Detailed calculation": f"Safety logic is root-sum-square at row level: √(R6² + R7² + R8²). The waterfall uses ADS-weighted average of official Safety (DSI): {safety_avg_raw:.2f}. Illustrative calculation from weighted-average inputs: √({r6_avg:.2f}² + {r7_avg:.2f}² + {r8_avg:.2f}²) = {illustrative_safety_from_avg_components:.2f}.",
                 "Waterfall value (DSI)": round(safety_avg_raw, 2),
             },
             {
                 "Stock bucket": "Total",
-                "Inputs visualised": "Cycle + Transit + Safety (+ Reconciliation if needed)",
-                "Calculation shown in waterfall": "ADS-weighted average of 8 Reasons (DSI)",
+                "Reason descriptions": "Total 8 Reasons inventory target in days of supply.",
+                "Inputs visualised": "Cycle Stock + Transit Stock + Safety Stock (+ Reconciliation if needed)",
+                "Detailed calculation": f"Waterfall total uses ADS-weighted average of official 8 Reasons (DSI): {total_avg_raw:.2f}. Component sum = {subtotal_raw:.2f}; Reconciliation = {reconciliation_raw:.2f}.",
                 "Waterfall value (DSI)": round(total_avg_raw, 2),
             },
         ])
@@ -2066,6 +2071,8 @@ elif page == "🔬 Dashboard 4":
     wf_measure = ["relative", "relative", "relative"]
 
     reconciliation = total_dsi - (cycle_dsi + transit_dsi + safety_dsi)
+    illustrative_safety = (r6**2 + r7**2 + r8**2) ** 0.5
+
     if abs(reconciliation) >= 0.005:
         wf_labels.append("Reconciliation")
         wf_values.append(reconciliation)
@@ -2104,26 +2111,30 @@ elif page == "🔬 Dashboard 4":
     component_detail = pd.DataFrame([
         {
             "Stock bucket": "Cycle Stock",
+            "Reason descriptions": "R1 Information Cycle = review/order cycle stock; R2 Manufacturing Lot Size = manufacturing batch/lot stock; R3 Shipping Lot Size = shipment batch/lot stock; R4 Shipping Interval = stock required between shipments.",
             "Inputs visualised": f"R1={r1:.2f}, R2={r2:.2f}, R3={r3:.2f}, R4={r4:.2f}",
-            "Calculation shown in waterfall": "Cycle (DSI) from final output",
+            "Detailed calculation": f"Waterfall uses official Cycle (DSI) from final output: {cycle_dsi:.2f}. R1-R4 are shown as input drivers; the official Cycle (DSI) column already applies the app's cycle-stock calculation methodology.",
             "Waterfall value (DSI)": round(cycle_dsi, 2),
         },
         {
             "Stock bucket": "Transit Stock",
+            "Reason descriptions": "R5 Geography = geography / transit-time inventory required while material is in transit or constrained by supply lane geography.",
             "Inputs visualised": f"R5={r5:.2f}",
-            "Calculation shown in waterfall": "Transit (DSI) from final output",
+            "Detailed calculation": f"Waterfall uses official Transit (DSI) from final output: {transit_dsi:.2f}. R5 is the input driver for Transit Stock.",
             "Waterfall value (DSI)": round(transit_dsi, 2),
         },
         {
             "Stock bucket": "Safety Stock",
+            "Reason descriptions": "R6 Shipping Variation = shipping/lead-time variability; R7 Supply Variation = supply reliability variability; R8 Demand Variation = demand variability.",
             "Inputs visualised": f"R6={r6:.2f}, R7={r7:.2f}, R8={r8:.2f}",
-            "Calculation shown in waterfall": "Safety (DSI) from final output",
+            "Detailed calculation": f"Safety logic is root-sum-square: √(R6² + R7² + R8²) = √({r6:.2f}² + {r7:.2f}² + {r8:.2f}²) = {illustrative_safety:.2f}. Waterfall uses official Safety (DSI): {safety_dsi:.2f}.",
             "Waterfall value (DSI)": round(safety_dsi, 2),
         },
         {
             "Stock bucket": "Total",
-            "Inputs visualised": "Cycle + Transit + Safety (+ Reconciliation if needed)",
-            "Calculation shown in waterfall": "8 Reasons (DSI) from final output",
+            "Reason descriptions": "Total 8 Reasons inventory target in days of supply.",
+            "Inputs visualised": "Cycle Stock + Transit Stock + Safety Stock (+ Reconciliation if needed)",
+            "Detailed calculation": f"Waterfall total uses official 8 Reasons (DSI): {total_dsi:.2f}. Component sum = {(cycle_dsi + transit_dsi + safety_dsi):.2f}; Reconciliation = {reconciliation:.2f}.",
             "Waterfall value (DSI)": round(total_dsi, 2),
         },
     ])
