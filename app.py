@@ -1570,9 +1570,9 @@ elif page == "📈 Dashboard 3":
 
     # ── R1–R8 weighted-average bridge / waterfall breakdown ────────────────
     # Logic:
-    #   Cycle Stock  = max(R1, R2, R3, R4)
+    #   Cycle Stock   = max(R1, R2, R3, R4)
     #   Transit Stock = R5, displayed from the Cycle Stock subtotal level
-    #   Safety Stock  = sqrt(R6² + R7² + R8²), displayed from the Cycle Stock subtotal level
+    #   Safety Stock  = sqrt(R6² + R7² + R8²), displayed from the top of Transit Stock
     #   Total         = Cycle Stock + Transit Stock + Safety Stock
     with c1:
         st.markdown("**R1–R8 Waterfall Breakdown**")
@@ -1583,6 +1583,7 @@ elif page == "📈 Dashboard 3":
         transit_dsi = round(r5, 2)
         safety_dsi = round((r6**2 + r7**2 + r8**2) ** 0.5, 2)
         total_dsi = round(cycle_dsi + transit_dsi + safety_dsi, 2)
+        transit_top_dsi = round(cycle_dsi + transit_dsi, 2)
 
         wf_labels = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
                      "= Cycle Stock", "R5 Transit Stock", "R6 Ship Var", "R7 Supply Var",
@@ -1592,13 +1593,15 @@ elif page == "📈 Dashboard 3":
                    f"{transit_dsi:.2f}", f"{r6:.2f}", f"{r7:.2f}", f"{r8:.2f}",
                    f"{safety_dsi:.2f}", f"{total_dsi:.2f}"]
         # R1-R4 and R6-R8 show the source components. Cycle is max(R1-R4), not their sum.
-        # Transit and Safety are both floating from the Cycle Stock subtotal level.
+        # Transit floats from the Cycle Stock subtotal level.
+        # R6 starts from the top of Transit Stock; R7 and R8 continue the safety bridge.
+        # Safety Stock is a floating subtotal from the top of Transit Stock.
         # TOTAL is anchored at zero and equals Cycle + Transit + Safety.
         wf_bases = [0, 0, 0, 0,
                     0,
                     cycle_dsi,
-                    cycle_dsi, cycle_dsi, cycle_dsi,
-                    cycle_dsi,
+                    transit_top_dsi, transit_top_dsi + r6, transit_top_dsi + r6 + r7,
+                    transit_top_dsi,
                     0]
         wf_colors = ["#3b82f6", "#3b82f6", "#3b82f6", "#3b82f6", "#1d4ed8",
                      "#f97316", "#ef4444", "#ef4444", "#ef4444",
@@ -1620,7 +1623,7 @@ elif page == "📈 Dashboard 3":
             showlegend=False,
         )
         st.plotly_chart(fig1, use_container_width=True)
-        st.caption("Waterfall logic: Cycle Stock = max(R1, R2, R3, R4); Transit Stock = R5 and starts at the Cycle Stock level; Safety Stock = √(R6² + R7² + R8²) and starts at the Cycle Stock level; Total = Cycle Stock + Transit Stock + Safety Stock.")
+        st.caption("Waterfall logic: Cycle Stock = max(R1, R2, R3, R4); Transit Stock = R5 and starts at the Cycle Stock level; Safety Stock = √(R6² + R7² + R8²), with R6 starting at the top of Transit Stock; Total = Cycle Stock + Transit Stock + Safety Stock.")
 
     # ── Stacked DSI by INCO term ──────────────────────────────────────────
     with c2:
@@ -2010,14 +2013,15 @@ elif page == "🔬 Dashboard 4":
     st.markdown("<div class='section-header'>📉 R1–R8 Waterfall Breakdown</div>", unsafe_allow_html=True)
 
     # Logic:
-    #   Cycle Stock  = max(R1, R2, R3, R4)
+    #   Cycle Stock   = max(R1, R2, R3, R4)
     #   Transit Stock = R5, displayed from the Cycle Stock subtotal level
-    #   Safety Stock  = sqrt(R6² + R7² + R8²), displayed from the Cycle Stock subtotal level
+    #   Safety Stock  = sqrt(R6² + R7² + R8²), displayed from the top of Transit Stock
     #   Total         = Cycle Stock + Transit Stock + Safety Stock
     wf_cycle_dsi = round(max(r1, r2, r3, r4), 2)
     wf_transit_dsi = round(r5, 2)
     wf_safety_dsi = round((r6**2 + r7**2 + r8**2) ** 0.5, 2)
     wf_total_dsi = round(wf_cycle_dsi + wf_transit_dsi + wf_safety_dsi, 2)
+    wf_transit_top_dsi = round(wf_cycle_dsi + wf_transit_dsi, 2)
 
     wf_labels = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
                  "= Cycle Stock", "R5 Transit Stock", "R6 Ship Var", "R7 Supply Var",
@@ -2027,13 +2031,15 @@ elif page == "🔬 Dashboard 4":
                f"{wf_transit_dsi:.2f}", f"{r6:.2f}", f"{r7:.2f}", f"{r8:.2f}",
                f"{wf_safety_dsi:.2f}", f"{wf_total_dsi:.2f}"]
     # R1-R4 and R6-R8 show the source components. Cycle is max(R1-R4), not their sum.
-    # Transit and Safety are both floating from the Cycle Stock subtotal level.
+    # Transit floats from the Cycle Stock subtotal level.
+    # R6 starts from the top of Transit Stock; R7 and R8 continue the safety bridge.
+    # Safety Stock is a floating subtotal from the top of Transit Stock.
     # TOTAL is anchored at zero and equals Cycle + Transit + Safety.
     wf_bases = [0, 0, 0, 0,
                 0,
                 wf_cycle_dsi,
-                wf_cycle_dsi, wf_cycle_dsi, wf_cycle_dsi,
-                wf_cycle_dsi,
+                wf_transit_top_dsi, wf_transit_top_dsi + r6, wf_transit_top_dsi + r6 + r7,
+                wf_transit_top_dsi,
                 0]
     wf_colors = ["#3b82f6", "#3b82f6", "#3b82f6", "#3b82f6", "#1d4ed8",
                  "#f97316", "#ef4444", "#ef4444", "#ef4444",
@@ -2055,7 +2061,7 @@ elif page == "🔬 Dashboard 4":
         showlegend=False,
     )
     st.plotly_chart(fig_wf, use_container_width=True)
-    st.caption("Waterfall logic: Cycle Stock = max(R1, R2, R3, R4); Transit Stock = R5 and starts at the Cycle Stock level; Safety Stock = √(R6² + R7² + R8²) and starts at the Cycle Stock level; Total = Cycle Stock + Transit Stock + Safety Stock.")
+    st.caption("Waterfall logic: Cycle Stock = max(R1, R2, R3, R4); Transit Stock = R5 and starts at the Cycle Stock level; Safety Stock = √(R6² + R7² + R8²), with R6 starting at the top of Transit Stock; Total = Cycle Stock + Transit Stock + Safety Stock.")
 
     # ── R1–R8 detailed cards ──────────────────────────────────────────────────
     st.markdown("<div class='section-header'>📋 Detailed R1–R8 Calculations</div>", unsafe_allow_html=True)
@@ -2316,6 +2322,4 @@ elif page == "🔬 Dashboard 4":
         pd.DataFrame(param_data).style.format({"Value": lambda v: f"{v:,.3f}" if isinstance(v, float) else v}),
         use_container_width=True, height=680
     )
-
-
 
