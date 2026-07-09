@@ -1569,21 +1569,42 @@ elif page == "📈 Dashboard 3":
     c1, c2 = st.columns(2)
 
     # ── R1–R8 weighted-average bridge / waterfall breakdown ────────────────
-    # Same visual logic as Dashboard 4, adapted to Dashboard 3 weighted averages:
-    #   Cycle Stock   = max(R1, R2, R3, R4)
-    #   Transit Stock = R5, displayed from the Cycle Stock subtotal level
-    #   R6 starts from the top of Transit Stock; R7 and R8 continue from there
-    #   Safety Stock  = sqrt(R6² + R7² + R8²), displayed from the top of Transit Stock
-    #   Total         = Cycle Stock + Transit Stock + Safety Stock
+    # Same visual logic as Dashboard 4, adapted to Dashboard 3 filters.
+    # Important: because max() and sqrt() are non-linear, Dashboard 3 aggregates
+    # the row-level Cycle/Safety logic using the same weighted-average basis as
+    # the KPI row. The waterfall TOTAL is taken from 8 Reasons (DSI), so it
+    # matches Avg 8 Reasons (DSI).
     with c1:
         st.markdown("**R1–R8 Waterfall Breakdown**")
 
+        def w_avg_series(df, values):
+            """Weighted average of a calculated row-level Series by Average Daily Sales."""
+            if df.empty or ads not in df.columns:
+                return 0.0
+            vals = pd.to_numeric(values, errors="coerce").fillna(0)
+            weights = pd.to_numeric(df[ads], errors="coerce").fillna(0)
+            denom = weights.sum()
+            if denom == 0:
+                return round(float(vals.mean()), 2) if len(vals) else 0.0
+            return round(float((vals * weights).sum() / denom), 2)
+
+        # Display weighted-average R1-R8 source components.
         r_vals = [w_avg(fdf3, c) for c in R_COLS]
         r1, r2, r3, r4, r5, r6, r7, r8 = r_vals
-        cycle_dsi = round(max(r1, r2, r3, r4), 2)
-        transit_dsi = round(r5, 2)
-        safety_dsi = round((r6**2 + r7**2 + r8**2) ** 0.5, 2)
-        total_dsi = round(cycle_dsi + transit_dsi + safety_dsi, 2)
+
+        # Aggregate using row-level Dashboard 4 logic, not max/sqrt of aggregate averages.
+        r_num = fdf3[R_COLS].apply(pd.to_numeric, errors="coerce").fillna(0)
+        row_cycle = r_num[R_COLS[:4]].max(axis=1)
+        row_transit = r_num[R_COLS[4]]
+        row_safety = (r_num[R_COLS[5]]**2 + r_num[R_COLS[6]]**2 + r_num[R_COLS[7]]**2) ** 0.5
+        row_total = row_cycle + row_transit + row_safety
+
+        cycle_dsi = w_avg_series(fdf3, row_cycle)
+        transit_dsi = w_avg_series(fdf3, row_transit)
+        safety_dsi = w_avg_series(fdf3, row_safety)
+        calculated_total_dsi = w_avg_series(fdf3, row_total)
+        # Match the KPI exactly when the final output already provides 8 Reasons (DSI).
+        total_dsi = w_avg(fdf3, "8 Reasons (DSI)") if "8 Reasons (DSI)" in fdf3.columns else calculated_total_dsi
         transit_top_dsi = round(cycle_dsi + transit_dsi, 2)
 
         wf_labels = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
@@ -1593,13 +1614,6 @@ elif page == "📈 Dashboard 3":
         wf_text = [f"{r1:.2f}", f"{r2:.2f}", f"{r3:.2f}", f"{r4:.2f}", f"{cycle_dsi:.2f}",
                    f"{transit_dsi:.2f}", f"{r6:.2f}", f"{r7:.2f}", f"{r8:.2f}",
                    f"{safety_dsi:.2f}", f"{total_dsi:.2f}"]
-        # Bases mirror Dashboard 4:
-        # - R1-R4 are source components from zero.
-        # - Cycle Stock is a zero-anchored subtotal.
-        # - R5 starts at Cycle Stock.
-        # - R6 starts at Cycle Stock + Transit Stock; R7 and R8 continue after R6/R7.
-        # - Safety Stock starts at Cycle Stock + Transit Stock.
-        # - TOTAL is zero-anchored and equals Cycle + Transit + Safety.
         wf_bases = [0, 0, 0, 0,
                     0,
                     cycle_dsi,
@@ -1626,7 +1640,7 @@ elif page == "📈 Dashboard 3":
             showlegend=False,
         )
         st.plotly_chart(fig1, use_container_width=True)
-        st.caption("Waterfall logic: Cycle Stock = max(R1, R2, R3, R4); Transit Stock = R5 and starts at the Cycle Stock level; R6 starts at the top of Transit Stock; Safety Stock = √(R6² + R7² + R8²) and starts at the top of Transit Stock; Total = Cycle Stock + Transit Stock + Safety Stock.")
+        st.caption("Waterfall logic: Cycle Stock = weighted average of row-level max(R1, R2, R3, R4); Transit Stock = weighted average of R5 and starts at the Cycle Stock level; R6 starts at the top of Transit Stock; Safety Stock = weighted average of row-level √(R6² + R7² + R8²) and starts at the top of Transit Stock; Total matches Avg 8 Reasons (DSI).")
 
     # ── Stacked DSI by INCO term ──────────────────────────────────────────
     with c2:
@@ -2015,16 +2029,16 @@ elif page == "🔬 Dashboard 4":
     # ── Corrected bridge / waterfall chart ───────────────────────────────────
     st.markdown("<div class='section-header'>📉 R1–R8 Waterfall Breakdown</div>", unsafe_allow_html=True)
 
-    # Logic:
+    # Same row-level logic used for Dashboard 3, applied to the selected material:
     #   Cycle Stock   = max(R1, R2, R3, R4)
     #   Transit Stock = R5, displayed from the Cycle Stock subtotal level
     #   R6 starts from the top of Transit Stock; R7 and R8 continue from there
     #   Safety Stock  = sqrt(R6² + R7² + R8²), displayed from the top of Transit Stock
-    #   Total         = Cycle Stock + Transit Stock + Safety Stock
+    #   TOTAL uses the official 8 Reasons (DSI) field so it matches the KPI/output value.
     wf_cycle_dsi = round(max(r1, r2, r3, r4), 2)
     wf_transit_dsi = round(r5, 2)
     wf_safety_dsi = round((r6**2 + r7**2 + r8**2) ** 0.5, 2)
-    wf_total_dsi = round(wf_cycle_dsi + wf_transit_dsi + wf_safety_dsi, 2)
+    wf_total_dsi = round(total_dsi, 2)
     wf_transit_top_dsi = round(wf_cycle_dsi + wf_transit_dsi, 2)
 
     wf_labels = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
@@ -2034,13 +2048,6 @@ elif page == "🔬 Dashboard 4":
     wf_text = [f"{r1:.2f}", f"{r2:.2f}", f"{r3:.2f}", f"{r4:.2f}", f"{wf_cycle_dsi:.2f}",
                f"{wf_transit_dsi:.2f}", f"{r6:.2f}", f"{r7:.2f}", f"{r8:.2f}",
                f"{wf_safety_dsi:.2f}", f"{wf_total_dsi:.2f}"]
-    # Bases:
-    # - R1-R4 are source components from zero.
-    # - Cycle Stock is a zero-anchored subtotal.
-    # - R5 starts at Cycle Stock.
-    # - R6 starts at Cycle Stock + Transit Stock; R7 and R8 continue after R6/R7.
-    # - Safety Stock starts at Cycle Stock + Transit Stock.
-    # - TOTAL is zero-anchored and equals Cycle + Transit + Safety.
     wf_bases = [0, 0, 0, 0,
                 0,
                 wf_cycle_dsi,
@@ -2067,7 +2074,7 @@ elif page == "🔬 Dashboard 4":
         showlegend=False,
     )
     st.plotly_chart(fig_wf, use_container_width=True)
-    st.caption("Waterfall logic: Cycle Stock = max(R1, R2, R3, R4); Transit Stock = R5 and starts at the Cycle Stock level; R6 starts at the top of Transit Stock; Safety Stock = √(R6² + R7² + R8²) and starts at the top of Transit Stock; Total = Cycle Stock + Transit Stock + Safety Stock.")
+    st.caption("Waterfall logic: Cycle Stock = max(R1, R2, R3, R4); Transit Stock = R5 and starts at the Cycle Stock level; R6 starts at the top of Transit Stock; Safety Stock = √(R6² + R7² + R8²) and starts at the top of Transit Stock; Total uses the official 8 Reasons (DSI) value.")
 
     # ── R1–R8 detailed cards ──────────────────────────────────────────────────
     st.markdown("<div class='section-header'>📋 Detailed R1–R8 Calculations</div>", unsafe_allow_html=True)
@@ -2328,4 +2335,5 @@ elif page == "🔬 Dashboard 4":
         pd.DataFrame(param_data).style.format({"Value": lambda v: f"{v:,.3f}" if isinstance(v, float) else v}),
         use_container_width=True, height=680
     )
+
 
