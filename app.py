@@ -1568,11 +1568,11 @@ elif page == "📈 Dashboard 3":
 
     c1, c2 = st.columns(2)
 
-    # ── R1–R8 weighted-average grouped waterfall breakdown ────────────────
-    # Correct subtotal logic:
+    # ── R1–R8 weighted-average running waterfall breakdown ────────────────
+    # Correct subtotal logic and running display:
     #   Cycle  = R1 + R2 + R3 + R4
-    #   Transit = R5
-    #   Safety = R6 + R7 + R8
+    #   Transit = R5, displayed from the Cycle subtotal
+    #   Safety = R6 + R7 + R8, with R6-R8 displayed from Cycle + Transit
     #   Total  = Cycle + Transit + Safety
     with c1:
         st.markdown("**R1–R8 Waterfall Breakdown**")
@@ -1583,15 +1583,19 @@ elif page == "📈 Dashboard 3":
         transit_dsi = round(r5, 2)
         safety_dsi  = round(r6 + r7 + r8, 2)
         total_dsi   = round(cycle_dsi + transit_dsi + safety_dsi, 2)
+        cycle_transit_dsi = round(cycle_dsi + transit_dsi, 2)
 
         wf_labels = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
                      "= Cycle", "R5 Geography", "= Transit", "R6 Ship Var", "R7 Supply Var",
                      "R8 Demand Var", "= Safety", "TOTAL"]
-        wf_values = [r1, r2, r3, r4, cycle_dsi, r5, transit_dsi, r6, r7, r8, safety_dsi, total_dsi]
-        # Floating-bar bases create true group subtotals instead of Plotly's cumulative totals.
+        wf_values = [r1, r2, r3, r4, cycle_dsi, r5, cycle_transit_dsi, r6, r7, r8, safety_dsi, total_dsi]
+        wf_text   = [f"{r1:.2f}", f"{r2:.2f}", f"{r3:.2f}", f"{r4:.2f}", f"{cycle_dsi:.2f}",
+                     f"{r5:.2f}", f"{cycle_transit_dsi:.2f}", f"{r6:.2f}", f"{r7:.2f}", f"{r8:.2f}",
+                     f"{safety_dsi:.2f}", f"{total_dsi:.2f}"]
+        # Floating-bar bases make each reason start from the previous subtotal/running level.
         wf_bases  = [0, r1, r1 + r2, r1 + r2 + r3, 0,
-                     0, 0,
-                     0, r6, r6 + r7, 0,
+                     cycle_dsi, 0,
+                     cycle_transit_dsi, cycle_transit_dsi + r6, cycle_transit_dsi + r6 + r7, 0,
                      0]
         wf_colors = ["#3b82f6", "#3b82f6", "#3b82f6", "#3b82f6", "#1d4ed8",
                      "#f97316", "#ea580c", "#ef4444", "#ef4444", "#ef4444",
@@ -1600,9 +1604,9 @@ elif page == "📈 Dashboard 3":
         fig1 = go.Figure(go.Bar(
             x=wf_labels, y=wf_values, base=wf_bases,
             marker_color=wf_colors,
-            text=[f"{v:.2f}" for v in wf_values],
+            text=wf_text,
             textposition="outside",
-            hovertemplate="%{x}<br>DSI: %{y:.2f}<extra></extra>",
+            hovertemplate="%{x}<br>Contribution/total: %{y:.2f} DSI<br>Starts at: %{base:.2f} DSI<extra></extra>",
         ))
         fig1.update_layout(
             height=380, margin=dict(l=10, r=10, t=20, b=10),
@@ -1998,27 +2002,31 @@ elif page == "🔬 Dashboard 4":
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Corrected grouped waterfall chart ─────────────────────────────────────
+    # ── Corrected running grouped waterfall chart ─────────────────────────────
     st.markdown("<div class='section-header'>📉 R1–R8 Waterfall Breakdown</div>", unsafe_allow_html=True)
 
-    # Use explicit component sums for waterfall subtotals so the chart is auditable:
+    # Correct subtotal logic and running display:
     #   Cycle  = R1 + R2 + R3 + R4
-    #   Transit = R5
-    #   Safety = R6 + R7 + R8
+    #   Transit = R5, displayed from the Cycle subtotal
+    #   Safety = R6 + R7 + R8, with R6-R8 displayed from Cycle + Transit
     #   Total  = Cycle + Transit + Safety
     wf_cycle_dsi   = round(r1 + r2 + r3 + r4, 2)
     wf_transit_dsi = round(r5, 2)
     wf_safety_dsi  = round(r6 + r7 + r8, 2)
     wf_total_dsi   = round(wf_cycle_dsi + wf_transit_dsi + wf_safety_dsi, 2)
+    wf_cycle_transit_dsi = round(wf_cycle_dsi + wf_transit_dsi, 2)
 
     wf_labels = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
                  "= Cycle", "R5 Geography", "= Transit", "R6 Ship Var", "R7 Supply Var",
                  "R8 Demand Var", "= Safety", "TOTAL"]
-    wf_values = [r1, r2, r3, r4, wf_cycle_dsi, r5, wf_transit_dsi, r6, r7, r8, wf_safety_dsi, wf_total_dsi]
-    # Floating-bar bases create true group subtotals instead of cumulative Plotly Waterfall totals.
+    wf_values = [r1, r2, r3, r4, wf_cycle_dsi, r5, wf_cycle_transit_dsi, r6, r7, r8, wf_safety_dsi, wf_total_dsi]
+    wf_text   = [f"{r1:.2f}", f"{r2:.2f}", f"{r3:.2f}", f"{r4:.2f}", f"{wf_cycle_dsi:.2f}",
+                 f"{r5:.2f}", f"{wf_cycle_transit_dsi:.2f}", f"{r6:.2f}", f"{r7:.2f}", f"{r8:.2f}",
+                 f"{wf_safety_dsi:.2f}", f"{wf_total_dsi:.2f}"]
+    # Floating-bar bases make each reason start from the previous subtotal/running level.
     wf_bases  = [0, r1, r1 + r2, r1 + r2 + r3, 0,
-                 0, 0,
-                 0, r6, r6 + r7, 0,
+                 wf_cycle_dsi, 0,
+                 wf_cycle_transit_dsi, wf_cycle_transit_dsi + r6, wf_cycle_transit_dsi + r6 + r7, 0,
                  0]
     wf_colors = ["#3b82f6", "#3b82f6", "#3b82f6", "#3b82f6", "#1d4ed8",
                  "#f97316", "#ea580c", "#ef4444", "#ef4444", "#ef4444",
@@ -2027,9 +2035,9 @@ elif page == "🔬 Dashboard 4":
     fig_wf = go.Figure(go.Bar(
         x=wf_labels, y=wf_values, base=wf_bases,
         marker_color=wf_colors,
-        text=[f"{v:.2f}" for v in wf_values],
+        text=wf_text,
         textposition="outside",
-        hovertemplate="%{x}<br>DSI: %{y:.2f}<extra></extra>",
+        hovertemplate="%{x}<br>Contribution/total: %{y:.2f} DSI<br>Starts at: %{base:.2f} DSI<extra></extra>",
     ))
     fig_wf.update_layout(
         height=380, margin=dict(l=10,r=10,t=20,b=10),
@@ -2300,6 +2308,4 @@ elif page == "🔬 Dashboard 4":
         pd.DataFrame(param_data).style.format({"Value": lambda v: f"{v:,.3f}" if isinstance(v, float) else v}),
         use_container_width=True, height=680
     )
-
-
 
