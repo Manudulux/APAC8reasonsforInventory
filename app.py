@@ -8,7 +8,7 @@ from io import BytesIO
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="8 Reasons Inventory Tool – Goodyear",
-    page_icon="🔴",
+    page_icon="",
     layout="wide",
 )
 
@@ -934,29 +934,10 @@ elif page == "🔧 Global Settings":
     config   = gp_class.get_global_config()
     params   = config["global_parameters"][0]
 
-    # RM Segmentation defaults from the requested Global Settings panel.
     rm_seg_params = params.get("rm_segmentation", {}) or {}
-
-    def _rm_range(section_name, band_name, default_min, default_max):
-        """Read RM segmentation ranges from old/new config shapes, with requested defaults."""
-        section = rm_seg_params.get(section_name, {}) or {}
-        value = section.get(str(band_name), section.get(band_name, None))
-        if isinstance(value, dict):
-            low = value.get("min", value.get("from", value.get("lower", default_min)))
-            high = value.get("max", value.get("to", value.get("upper", default_max)))
-            return float(low), float(high)
-        if isinstance(value, (list, tuple)) and len(value) >= 2:
-            return float(value[0]), float(value[1])
-        low = section.get(f"{band_name}_min", section.get(f"{band_name}_from", default_min))
-        high = section.get(f"{band_name}_max", section.get(f"{band_name}_to", default_max))
-        return float(low), float(high)
-
-    v1_min_default, v1_max_default = _rm_range("variance", "1", 0, 41)
-    v2_min_default, v2_max_default = _rm_range("variance", "2", 41, 60)
-    v3_min_default, v3_max_default = _rm_range("variance", "3", 60, 100)
-    a_min_default,  a_max_default  = _rm_range("segment",  "A", 0, 80)
-    b_min_default,  b_max_default  = _rm_range("segment",  "B", 80, 96)
-    c_min_default,  c_max_default  = _rm_range("segment",  "C", 96, 100)
+    def _rm_val(section, group, key, default):
+        item = (rm_seg_params.get(section, {}) or {}).get(group, {})
+        return float(item.get(key, default)) if isinstance(item, dict) else float(default)
 
     with st.form("global_settings_form"):
         st.subheader("📈 Forecast Settings")
@@ -985,48 +966,23 @@ elif page == "🔧 Global Settings":
                                      value=params["price_conversion"].get("USD_value", 84), min_value=1)
 
         st.subheader("📦 RM Segmentation")
-        st.caption("Configure the variance bands and ABC segment percentage thresholds used by RM segmentation.")
-        with st.container():
-            variance_col, segment_col = st.columns(2)
-            with variance_col:
-                st.markdown("**Variance:**")
-                vcols = st.columns([0.25, 0.35, 0.05, 0.35])
-                vcols[0].markdown("**1:**")
-                v1_min = vcols[1].number_input("Variance 1 min", value=v1_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_1_min")
-                vcols[2].markdown("-")
-                v1_max = vcols[3].number_input("Variance 1 max", value=v1_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_1_max")
-
-                vcols = st.columns([0.25, 0.35, 0.05, 0.35])
-                vcols[0].markdown("**2:**")
-                v2_min = vcols[1].number_input("Variance 2 min", value=v2_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_2_min")
-                vcols[2].markdown("-")
-                v2_max = vcols[3].number_input("Variance 2 max", value=v2_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_2_max")
-
-                vcols = st.columns([0.25, 0.35, 0.05, 0.35])
-                vcols[0].markdown("**3:**")
-                v3_min = vcols[1].number_input("Variance 3 min", value=v3_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_3_min")
-                vcols[2].markdown("-")
-                v3_max = vcols[3].number_input("Variance 3 max", value=v3_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_3_max")
-
-            with segment_col:
-                st.markdown("**Segment:**")
-                scols = st.columns([0.25, 0.35, 0.05, 0.35])
-                scols[0].markdown("**A:**")
-                a_min = scols[1].number_input("Segment A min", value=a_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_a_min")
-                scols[2].markdown("-")
-                a_max = scols[3].number_input("Segment A max", value=a_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_a_max")
-
-                scols = st.columns([0.25, 0.35, 0.05, 0.35])
-                scols[0].markdown("**B:**")
-                b_min = scols[1].number_input("Segment B min", value=b_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_b_min")
-                scols[2].markdown("-")
-                b_max = scols[3].number_input("Segment B max", value=b_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_b_max")
-
-                scols = st.columns([0.25, 0.35, 0.05, 0.35])
-                scols[0].markdown("**C:**")
-                c_min = scols[1].number_input("Segment C min", value=c_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_c_min")
-                scols[2].markdown("-")
-                c_max = scols[3].number_input("Segment C max", value=c_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_c_max")
+        vc, sc = st.columns(2)
+        with vc:
+            st.markdown("**Variance:**")
+            v1_min = st.number_input("Variance 1 min", value=_rm_val("variance", "1", "min", 0), min_value=0.0, max_value=100.0, key="rm_v1_min")
+            v1_max = st.number_input("Variance 1 max", value=_rm_val("variance", "1", "max", 41), min_value=0.0, max_value=100.0, key="rm_v1_max")
+            v2_min = st.number_input("Variance 2 min", value=_rm_val("variance", "2", "min", 41), min_value=0.0, max_value=100.0, key="rm_v2_min")
+            v2_max = st.number_input("Variance 2 max", value=_rm_val("variance", "2", "max", 60), min_value=0.0, max_value=100.0, key="rm_v2_max")
+            v3_min = st.number_input("Variance 3 min", value=_rm_val("variance", "3", "min", 60), min_value=0.0, max_value=100.0, key="rm_v3_min")
+            v3_max = st.number_input("Variance 3 max", value=_rm_val("variance", "3", "max", 100), min_value=0.0, max_value=100.0, key="rm_v3_max")
+        with sc:
+            st.markdown("**Segment:**")
+            a_min = st.number_input("Segment A min", value=_rm_val("segment", "A", "min", 0), min_value=0.0, max_value=100.0, key="rm_a_min")
+            a_max = st.number_input("Segment A max", value=_rm_val("segment", "A", "max", 80), min_value=0.0, max_value=100.0, key="rm_a_max")
+            b_min = st.number_input("Segment B min", value=_rm_val("segment", "B", "min", 80), min_value=0.0, max_value=100.0, key="rm_b_min")
+            b_max = st.number_input("Segment B max", value=_rm_val("segment", "B", "max", 96), min_value=0.0, max_value=100.0, key="rm_b_max")
+            c_min = st.number_input("Segment C min", value=_rm_val("segment", "C", "min", 96), min_value=0.0, max_value=100.0, key="rm_c_min")
+            c_max = st.number_input("Segment C max", value=_rm_val("segment", "C", "max", 100), min_value=0.0, max_value=100.0, key="rm_c_max")
 
         st.subheader("🏭 Production Days per Month")
         prod_days    = params.get("production_days", {})
@@ -1569,9 +1525,8 @@ elif page == "📈 Dashboard 3":
     c1, c2 = st.columns(2)
 
     # ── Avg 8 Reasons DSI waterfall ───────────────────────────────────────
-    # Reflects the logic leading to Avg 8 Reasons (DSI):
-    #   Avg 8 Reasons (DSI) = Avg Cycle (DSI) + Avg R5 Geography (DSI) + Avg Safety (DSI)
-    # Transit Stock is intentionally R5, not the separate Transit (DSI) column.
+    # Business-rule view of Avg 8 Reasons (DSI): Cycle Stock + R5 Geography + Safety Stock.
+    # Important: Transit Stock in this chart is explicitly R5 Geography (DSI), not Transit (DSI).
     with c1:
         st.markdown("**Avg 8 Reasons DSI Waterfall**")
 
@@ -1586,7 +1541,6 @@ elif page == "📈 Dashboard 3":
                 return float(values.mean()) if len(values) else 0.0
             return float((values * weights).sum() / denom)
 
-        # Weighted-average source reason values for the explanation panels below.
         r1_avg = w_avg_raw(fdf3, "R1 Information Cycle (DSI)")
         r2_avg = w_avg_raw(fdf3, "R2 Manufacturing Lot Size (DSI)")
         r3_avg = w_avg_raw(fdf3, "R3 Shipping Lot Size (DSI)")
@@ -1597,34 +1551,29 @@ elif page == "📈 Dashboard 3":
         r8_avg = w_avg_raw(fdf3, "R8 Demand Variation (DSI)")
 
         cycle_avg_raw = w_avg_raw(fdf3, "Cycle (DSI)")
-        # Business rule: Transit Stock in this waterfall is R5 Geography.
-        # Do not use the separate Transit (DSI) column here, because it can include other logic.
-        transit_avg_raw = r5_avg
+        transit_stock_r5_raw = r5_avg     # <- Explicit fix: chart Transit Stock equals R5 Geography
         safety_avg_raw = w_avg_raw(fdf3, "Safety (DSI)")
         total_avg_raw = w_avg_raw(fdf3, "8 Reasons (DSI)")
+        official_transit_dsi_reference = w_avg_raw(fdf3, "Transit (DSI)") if "Transit (DSI)" in fdf3.columns else 0.0
 
-        subtotal_raw = cycle_avg_raw + transit_avg_raw + safety_avg_raw
+        subtotal_raw = cycle_avg_raw + transit_stock_r5_raw + safety_avg_raw
         reconciliation_raw = total_avg_raw - subtotal_raw
-        illustrative_safety_from_avg_components = (r6_avg**2 + r7_avg**2 + r8_avg**2) ** 0.5
+        illustrative_safety = (r6_avg**2 + r7_avg**2 + r8_avg**2) ** 0.5
 
-        wf_labels = ["Cycle Stock", "Transit Stock = R5", "Safety Stock"]
-        wf_values = [cycle_avg_raw, transit_avg_raw, safety_avg_raw]
+        wf_labels = ["Cycle Stock", "R5 Geography", "Safety Stock"]
+        wf_values = [cycle_avg_raw, transit_stock_r5_raw, safety_avg_raw]
         wf_measure = ["relative", "relative", "relative"]
-
         if abs(reconciliation_raw) >= 0.005:
             wf_labels.append("Reconciliation")
             wf_values.append(reconciliation_raw)
             wf_measure.append("relative")
-
         wf_labels.append("Avg 8 Reasons DSI")
         wf_values.append(total_avg_raw)
         wf_measure.append("total")
 
         fig1 = go.Figure(go.Waterfall(
-            name="DSI", orientation="v",
-            measure=wf_measure, x=wf_labels, y=wf_values,
-            text=[f"{v:.2f}" for v in wf_values],
-            textposition="outside",
+            name="DSI", orientation="v", measure=wf_measure, x=wf_labels, y=wf_values,
+            text=[f"{v:.2f}" for v in wf_values], textposition="outside",
             connector=dict(line=dict(color="#e2e8f0", width=1, dash="dot")),
             increasing=dict(marker=dict(color="#3b82f6")),
             decreasing=dict(marker=dict(color="#f59e0b")),
@@ -1635,8 +1584,7 @@ elif page == "📈 Dashboard 3":
             plot_bgcolor="white", paper_bgcolor="white",
             yaxis=dict(gridcolor="#f1f5f9", title="DSI (Days of Supply Inventory)", rangemode="tozero"),
             xaxis=dict(tickfont=dict(size=10, family="IBM Plex Mono")),
-            font=dict(family="IBM Plex Sans"),
-            showlegend=False,
+            font=dict(family="IBM Plex Sans"), showlegend=False,
         )
         st.plotly_chart(fig1, use_container_width=True)
 
@@ -1644,60 +1592,42 @@ elif page == "📈 Dashboard 3":
         with st.expander("🔵 Cycle Stock — R1 to R4", expanded=True):
             st.markdown(f"""
             **Waterfall value:** `{cycle_avg_raw:.2f} DSI`  
-            **Calculation used in the chart:** ADS-weighted average of the official **Cycle (DSI)** field.
+            **Calculation used in the chart:** ADS-weighted average of official **Cycle (DSI)**.
 
-            **Input reasons shown one per line:**
             - **R1 Information Cycle:** review / order-cycle stock. Weighted average input: `{r1_avg:.2f} DSI`.
             - **R2 Manufacturing Lot Size:** manufacturing batch / lot-size stock. Weighted average input: `{r2_avg:.2f} DSI`.
             - **R3 Shipping Lot Size:** shipment batch / container / shipping-lot stock. Weighted average input: `{r3_avg:.2f} DSI`.
             - **R4 Shipping Interval:** stock required between shipment opportunities. Weighted average input: `{r4_avg:.2f} DSI`.
-
-            **Important:** Dashboard 3 uses the official aggregated **Cycle (DSI)** value so the waterfall reconciles to **Avg 8 Reasons (DSI)**. The R1-R4 lines above are the visible input drivers behind that bucket.
             """)
-
-        with st.expander("🟠 Transit Stock — R5", expanded=True):
+        with st.expander("🟠 Transit Stock — R5 Geography", expanded=True):
             st.markdown(f"""
-            **Waterfall value:** `{transit_avg_raw:.2f} DSI`  
+            **Waterfall value:** `{transit_stock_r5_raw:.2f} DSI`  
             **Calculation used in the chart:** ADS-weighted average of **R5 Geography (DSI)**.
 
-            **Input reason:**
             - **R5 Geography:** geography / lane / transit-time inventory required while material is in transit or constrained by supply route. Weighted average input: `{r5_avg:.2f} DSI`.
 
-            **Important:** This waterfall intentionally uses **R5 Geography (DSI)** as Transit Stock. It does **not** use the separate **Transit (DSI)** column, because that column may include additional output logic beyond R5.
+            **Important correction:** Dashboard 3 waterfall now uses **R5 Geography (DSI)** directly. The separate **Transit (DSI)** reference is `{official_transit_dsi_reference:.2f} DSI` and is **not** used for the waterfall bar, because it may include additional output logic beyond R5.
             """)
-
         with st.expander("🔴 Safety Stock — R6 to R8", expanded=True):
             st.markdown(f"""
             **Waterfall value:** `{safety_avg_raw:.2f} DSI`  
-            **Calculation used in the chart:** ADS-weighted average of the official **Safety (DSI)** field.
+            **Calculation used in the chart:** ADS-weighted average of official **Safety (DSI)**.
 
-            **Input reasons shown one per line:**
             - **R6 Shipping Variation:** shipping / lead-time variability. Weighted average input: `{r6_avg:.2f} DSI`.
             - **R7 Supply Variation:** supplier / supply reliability variability. Weighted average input: `{r7_avg:.2f} DSI`.
             - **R8 Demand Variation:** customer demand variability. Weighted average input: `{r8_avg:.2f} DSI`.
 
-            **Safety-stock calculation logic:**  
-            `Safety Stock = √(R6² + R7² + R8²)`
-
-            **Illustration using the weighted-average displayed inputs:**  
-            `√({r6_avg:.2f}² + {r7_avg:.2f}² + {r8_avg:.2f}²) = {illustrative_safety_from_avg_components:.2f} DSI`
-
-            **Important:** this illustration may differ slightly from the waterfall value because Dashboard 3 uses the weighted average of the official row-level **Safety (DSI)** values to stay aligned with the KPI.
+            `Safety Stock = √(R6² + R7² + R8²)`  
+            Illustration from displayed averages: `√({r6_avg:.2f}² + {r7_avg:.2f}² + {r8_avg:.2f}²) = {illustrative_safety:.2f} DSI`.
             """)
-
         with st.expander("⚫ Total and reconciliation", expanded=True):
             st.markdown(f"""
             **Waterfall total:** `{total_avg_raw:.2f} DSI`  
-            **Calculation used in the chart:** ADS-weighted average of the official **8 Reasons (DSI)** field.
-
-            **Component check:**
             - Cycle Stock: `{cycle_avg_raw:.2f} DSI`
-            - Transit Stock = R5: `{transit_avg_raw:.2f} DSI`
+            - R5 Geography: `{transit_stock_r5_raw:.2f} DSI`
             - Safety Stock: `{safety_avg_raw:.2f} DSI`
             - Component sum: `{subtotal_raw:.2f} DSI`
             - Reconciliation to official Avg 8 Reasons DSI: `{reconciliation_raw:.2f} DSI`
-
-            A **Reconciliation** bar appears only when the official **Avg 8 Reasons (DSI)** value does not exactly equal the visible component sum, usually because of rounding or source-calculation differences.
             """)
 
     # ── Stacked DSI by INCO term ──────────────────────────────────────────
@@ -2087,14 +2017,12 @@ elif page == "🔬 Dashboard 4":
     # ── 8 Reasons DSI waterfall ───────────────────────────────────────────────
     st.markdown("<div class='section-header'>📉 8 Reasons DSI Waterfall</div>", unsafe_allow_html=True)
 
-    # Reflects the logic leading to 8 Reasons (DSI):
-    #   8 Reasons (DSI) = Cycle (DSI) + R5 Geography (DSI) + Safety (DSI)
-    # Transit Stock is intentionally R5, not the separate Transit (DSI) column.
+    # Business-rule view: Cycle Stock + R5 Geography + Safety Stock.
+    # Transit Stock in this chart is explicitly R5 Geography (DSI), not Transit (DSI).
     wf_transit_dsi = r5
-    wf_labels = ["Cycle Stock", "Transit Stock = R5", "Safety Stock"]
+    wf_labels = ["Cycle Stock", "R5 Geography", "Safety Stock"]
     wf_values = [cycle_dsi, wf_transit_dsi, safety_dsi]
     wf_measure = ["relative", "relative", "relative"]
-
     reconciliation = total_dsi - (cycle_dsi + wf_transit_dsi + safety_dsi)
     illustrative_safety = (r6**2 + r7**2 + r8**2) ** 0.5
 
@@ -2102,28 +2030,22 @@ elif page == "🔬 Dashboard 4":
         wf_labels.append("Reconciliation")
         wf_values.append(reconciliation)
         wf_measure.append("relative")
-
     wf_labels.append("8 Reasons DSI")
     wf_values.append(total_dsi)
     wf_measure.append("total")
 
     fig_wf = go.Figure(go.Waterfall(
-        name="DSI", orientation="v",
-        measure=wf_measure, x=wf_labels, y=wf_values,
-        text=[f"{v:.2f}" for v in wf_values],
-        textposition="outside",
+        name="DSI", orientation="v", measure=wf_measure, x=wf_labels, y=wf_values,
+        text=[f"{v:.2f}" for v in wf_values], textposition="outside",
         connector=dict(line=dict(color="#e2e8f0", width=1, dash="dot")),
         increasing=dict(marker=dict(color="#3b82f6")),
         decreasing=dict(marker=dict(color="#f59e0b")),
         totals=dict(marker=dict(color="#0a192f")),
     ))
     fig_wf.update_layout(
-        height=380, margin=dict(l=10,r=10,t=20,b=10),
-        plot_bgcolor="white", paper_bgcolor="white",
+        height=380, margin=dict(l=10,r=10,t=20,b=10), plot_bgcolor="white", paper_bgcolor="white",
         yaxis=dict(gridcolor="#f1f5f9", title="DSI (Days of Supply Inventory)", rangemode="tozero"),
-        xaxis=dict(tickfont=dict(size=10, family="IBM Plex Mono")),
-        font=dict(family="IBM Plex Sans"),
-        showlegend=False,
+        xaxis=dict(tickfont=dict(size=10, family="IBM Plex Mono")), font=dict(family="IBM Plex Sans"), showlegend=False,
     )
     st.plotly_chart(fig_wf, use_container_width=True)
 
@@ -2131,60 +2053,36 @@ elif page == "🔬 Dashboard 4":
     with st.expander("🔵 Cycle Stock — R1 to R4", expanded=True):
         st.markdown(f"""
         **Waterfall value:** `{cycle_dsi:.2f} DSI`  
-        **Calculation used in the chart:** official **Cycle (DSI)** from final output.
-
-        **Input reasons shown one per line:**
         - **R1 Information Cycle:** review / order-cycle stock. Input: `{r1:.2f} DSI`.
         - **R2 Manufacturing Lot Size:** manufacturing batch / lot-size stock. Input: `{r2:.2f} DSI`.
         - **R3 Shipping Lot Size:** shipment batch / container / shipping-lot stock. Input: `{r3:.2f} DSI`.
         - **R4 Shipping Interval:** stock required between shipment opportunities. Input: `{r4:.2f} DSI`.
-
-        **Important:** the waterfall uses the official **Cycle (DSI)** value so it reconciles to the official **8 Reasons (DSI)**. The R1-R4 lines above are the visible input drivers behind that bucket.
         """)
-
-    with st.expander("🟠 Transit Stock — R5", expanded=True):
+    with st.expander("🟠 Transit Stock — R5 Geography", expanded=True):
         st.markdown(f"""
         **Waterfall value:** `{wf_transit_dsi:.2f} DSI`  
-        **Calculation used in the chart:** **R5 Geography (DSI)**.
+        - **R5 Geography:** geography / lane / transit-time inventory. Input: `{r5:.2f} DSI`.
 
-        **Input reason:**
-        - **R5 Geography:** geography / lane / transit-time inventory required while material is in transit or constrained by supply route. Input: `{r5:.2f} DSI`.
-
-        **Check performed:** the previous version used **Transit (DSI)** here. This version uses **R5** directly, so Dashboard 4 is consistent with the Dashboard 3 waterfall business logic.
+        **Check performed:** Dashboard 4 now also uses **R5 Geography (DSI)** directly in the waterfall instead of the separate **Transit (DSI)** field, whose value for this material is `{transit_dsi:.2f} DSI`.
         """)
-
     with st.expander("🔴 Safety Stock — R6 to R8", expanded=True):
         st.markdown(f"""
         **Waterfall value:** `{safety_dsi:.2f} DSI`  
-        **Calculation used in the chart:** official **Safety (DSI)** from final output.
-
-        **Input reasons shown one per line:**
         - **R6 Shipping Variation:** shipping / lead-time variability. Input: `{r6:.2f} DSI`.
         - **R7 Supply Variation:** supplier / supply reliability variability. Input: `{r7:.2f} DSI`.
         - **R8 Demand Variation:** customer demand variability. Input: `{r8:.2f} DSI`.
 
-        **Safety-stock calculation logic:**  
-        `Safety Stock = √(R6² + R7² + R8²)`
-
-        **Calculation using selected-material inputs:**  
-        `√({r6:.2f}² + {r7:.2f}² + {r8:.2f}²) = {illustrative_safety:.2f} DSI`
-
-        If the calculated value differs from the official **Safety (DSI)** field, the waterfall keeps the official field so the chart reconciles to **8 Reasons (DSI)**.
+        `Safety Stock = √(R6² + R7² + R8²)`  
+        Calculation from selected material inputs: `√({r6:.2f}² + {r7:.2f}² + {r8:.2f}²) = {illustrative_safety:.2f} DSI`.
         """)
-
     with st.expander("⚫ Total and reconciliation", expanded=True):
         st.markdown(f"""
         **Waterfall total:** `{total_dsi:.2f} DSI`  
-        **Calculation used in the chart:** official **8 Reasons (DSI)** from final output.
-
-        **Component check:**
         - Cycle Stock: `{cycle_dsi:.2f} DSI`
-        - Transit Stock = R5: `{wf_transit_dsi:.2f} DSI`
+        - R5 Geography: `{wf_transit_dsi:.2f} DSI`
         - Safety Stock: `{safety_dsi:.2f} DSI`
         - Component sum: `{(cycle_dsi + wf_transit_dsi + safety_dsi):.2f} DSI`
         - Reconciliation to official 8 Reasons DSI: `{reconciliation:.2f} DSI`
-
-        A **Reconciliation** bar appears only when the official **8 Reasons (DSI)** value does not exactly equal the visible component sum, usually because of rounding or source-calculation differences.
         """)
 
     # ── R1–R8 detailed cards ──────────────────────────────────────────────────
@@ -2446,6 +2344,4 @@ elif page == "🔬 Dashboard 4":
         pd.DataFrame(param_data).style.format({"Value": lambda v: f"{v:,.3f}" if isinstance(v, float) else v}),
         use_container_width=True, height=680
     )
-
-
 
