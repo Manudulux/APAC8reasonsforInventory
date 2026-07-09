@@ -1586,6 +1586,16 @@ elif page == "📈 Dashboard 3":
                 return float(values.mean()) if len(values) else 0.0
             return float((values * weights).sum() / denom)
 
+        # Weighted-average source reason values shown in the calculation detail below.
+        r1_avg = w_avg_raw(fdf3, "R1 Information Cycle (DSI)")
+        r2_avg = w_avg_raw(fdf3, "R2 Manufacturing Lot Size (DSI)")
+        r3_avg = w_avg_raw(fdf3, "R3 Shipping Lot Size (DSI)")
+        r4_avg = w_avg_raw(fdf3, "R4 Shipping Interval (DSI)")
+        r5_avg = w_avg_raw(fdf3, "R5 Geography (DSI)")
+        r6_avg = w_avg_raw(fdf3, "R6 Shipping Variation (DSI)")
+        r7_avg = w_avg_raw(fdf3, "R7 Supply Variation (DSI)")
+        r8_avg = w_avg_raw(fdf3, "R8 Demand Variation (DSI)")
+
         cycle_avg_raw = w_avg_raw(fdf3, "Cycle (DSI)")
         transit_avg_raw = w_avg_raw(fdf3, "Transit (DSI)")
         safety_avg_raw = w_avg_raw(fdf3, "Safety (DSI)")
@@ -1598,8 +1608,6 @@ elif page == "📈 Dashboard 3":
         wf_values = [cycle_avg_raw, transit_avg_raw, safety_avg_raw]
         wf_measure = ["relative", "relative", "relative"]
 
-        # Keep the chart reconciled to the KPI even if the source workbook has tiny rounding
-        # or calculation differences between component columns and 8 Reasons (DSI).
         if abs(reconciliation_raw) >= 0.005:
             wf_labels.append("Reconciliation")
             wf_values.append(reconciliation_raw)
@@ -1634,6 +1642,35 @@ elif page == "📈 Dashboard 3":
             "and Safety Stock groups R6-R8. A small Reconciliation bar is shown only if the workbook's 8 Reasons (DSI) "
             "does not exactly equal the sum of the three components due to rounding or source-calculation differences."
         )
+
+        component_detail = pd.DataFrame([
+            {
+                "Stock bucket": "Cycle Stock",
+                "Inputs visualised": f"R1={r1_avg:.2f}, R2={r2_avg:.2f}, R3={r3_avg:.2f}, R4={r4_avg:.2f}",
+                "Calculation shown in waterfall": "ADS-weighted average of Cycle (DSI)",
+                "Waterfall value (DSI)": round(cycle_avg_raw, 2),
+            },
+            {
+                "Stock bucket": "Transit Stock",
+                "Inputs visualised": f"R5={r5_avg:.2f}",
+                "Calculation shown in waterfall": "ADS-weighted average of Transit (DSI)",
+                "Waterfall value (DSI)": round(transit_avg_raw, 2),
+            },
+            {
+                "Stock bucket": "Safety Stock",
+                "Inputs visualised": f"R6={r6_avg:.2f}, R7={r7_avg:.2f}, R8={r8_avg:.2f}",
+                "Calculation shown in waterfall": "ADS-weighted average of Safety (DSI)",
+                "Waterfall value (DSI)": round(safety_avg_raw, 2),
+            },
+            {
+                "Stock bucket": "Total",
+                "Inputs visualised": "Cycle + Transit + Safety (+ Reconciliation if needed)",
+                "Calculation shown in waterfall": "ADS-weighted average of 8 Reasons (DSI)",
+                "Waterfall value (DSI)": round(total_avg_raw, 2),
+            },
+        ])
+        st.markdown("**Waterfall input components and calculations**")
+        st.dataframe(component_detail, use_container_width=True, hide_index=True)
 
     # ── Stacked DSI by INCO term ──────────────────────────────────────────
     with c2:
@@ -2063,6 +2100,35 @@ elif page == "🔬 Dashboard 4":
         "A small Reconciliation bar is shown only if the official 8 Reasons (DSI) value does not exactly equal "
         "the sum of the three components due to rounding or source-calculation differences."
     )
+
+    component_detail = pd.DataFrame([
+        {
+            "Stock bucket": "Cycle Stock",
+            "Inputs visualised": f"R1={r1:.2f}, R2={r2:.2f}, R3={r3:.2f}, R4={r4:.2f}",
+            "Calculation shown in waterfall": "Cycle (DSI) from final output",
+            "Waterfall value (DSI)": round(cycle_dsi, 2),
+        },
+        {
+            "Stock bucket": "Transit Stock",
+            "Inputs visualised": f"R5={r5:.2f}",
+            "Calculation shown in waterfall": "Transit (DSI) from final output",
+            "Waterfall value (DSI)": round(transit_dsi, 2),
+        },
+        {
+            "Stock bucket": "Safety Stock",
+            "Inputs visualised": f"R6={r6:.2f}, R7={r7:.2f}, R8={r8:.2f}",
+            "Calculation shown in waterfall": "Safety (DSI) from final output",
+            "Waterfall value (DSI)": round(safety_dsi, 2),
+        },
+        {
+            "Stock bucket": "Total",
+            "Inputs visualised": "Cycle + Transit + Safety (+ Reconciliation if needed)",
+            "Calculation shown in waterfall": "8 Reasons (DSI) from final output",
+            "Waterfall value (DSI)": round(total_dsi, 2),
+        },
+    ])
+    st.markdown("**Waterfall input components and calculations**")
+    st.dataframe(component_detail, use_container_width=True, hide_index=True)
 
     # ── R1–R8 detailed cards ──────────────────────────────────────────────────
     st.markdown("<div class='section-header'>📋 Detailed R1–R8 Calculations</div>", unsafe_allow_html=True)
