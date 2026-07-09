@@ -934,6 +934,32 @@ elif page == "🔧 Global Settings":
     config   = gp_class.get_global_config()
     params   = config["global_parameters"][0]
 
+    # Defaults shown in the RM Segmentation image:
+    # Variance classes: 1 = 0-41, 2 = 41-60, 3 = 60-100
+    # ABC segments:     A = 0-80, B = 80-96, C = 96-100
+    rm_seg_params = params.get("rm_segmentation", {}) or {}
+
+    def _rm_range(section_name, band_name, default_min, default_max):
+        """Read RM segmentation ranges from old/new config shapes, with image defaults."""
+        section = rm_seg_params.get(section_name, {}) or {}
+        value = section.get(str(band_name), section.get(band_name, None))
+        if isinstance(value, dict):
+            low = value.get("min", value.get("from", value.get("lower", default_min)))
+            high = value.get("max", value.get("to", value.get("upper", default_max)))
+            return float(low), float(high)
+        if isinstance(value, (list, tuple)) and len(value) >= 2:
+            return float(value[0]), float(value[1])
+        low = section.get(f"{band_name}_min", section.get(f"{band_name}_from", default_min))
+        high = section.get(f"{band_name}_max", section.get(f"{band_name}_to", default_max))
+        return float(low), float(high)
+
+    v1_min_default, v1_max_default = _rm_range("variance", "1", 0, 41)
+    v2_min_default, v2_max_default = _rm_range("variance", "2", 41, 60)
+    v3_min_default, v3_max_default = _rm_range("variance", "3", 60, 100)
+    a_min_default,  a_max_default  = _rm_range("segment",  "A", 0, 80)
+    b_min_default,  b_max_default  = _rm_range("segment",  "B", 80, 96)
+    c_min_default,  c_max_default  = _rm_range("segment",  "C", 96, 100)
+
     with st.form("global_settings_form"):
         st.subheader("📈 Forecast Settings")
         c1, c2 = st.columns(2)
@@ -959,6 +985,59 @@ elif page == "🔧 Global Settings":
         st.subheader("💱 Price Conversion")
         usd_value = st.number_input("USD Value (local currency per USD)",
                                      value=params["price_conversion"].get("USD_value", 84), min_value=1)
+
+        st.subheader("📦 RM Segmentation")
+        st.caption("Configure the variance bands and ABC segment percentage thresholds used by RM segmentation.")
+        rm_box_style = """
+        <style>
+        .rm-seg-box {border:1px solid #d1d5db;border-radius:10px;padding:14px;margin-bottom:8px;background:#ffffff;}
+        .rm-seg-label {font-weight:700;margin-top:0.4rem;}
+        </style>
+        """
+        st.markdown(rm_box_style, unsafe_allow_html=True)
+        with st.container():
+            st.markdown("<div class='rm-seg-box'>", unsafe_allow_html=True)
+            variance_col, segment_col = st.columns(2)
+            with variance_col:
+                st.markdown("**Variance:**")
+                vcols = st.columns([0.25, 0.35, 0.05, 0.35])
+                vcols[0].markdown("<div class='rm-seg-label'>1:</div>", unsafe_allow_html=True)
+                v1_min = vcols[1].number_input("Variance 1 min", value=v1_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_1_min")
+                vcols[2].markdown("-")
+                v1_max = vcols[3].number_input("Variance 1 max", value=v1_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_1_max")
+
+                vcols = st.columns([0.25, 0.35, 0.05, 0.35])
+                vcols[0].markdown("<div class='rm-seg-label'>2:</div>", unsafe_allow_html=True)
+                v2_min = vcols[1].number_input("Variance 2 min", value=v2_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_2_min")
+                vcols[2].markdown("-")
+                v2_max = vcols[3].number_input("Variance 2 max", value=v2_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_2_max")
+
+                vcols = st.columns([0.25, 0.35, 0.05, 0.35])
+                vcols[0].markdown("<div class='rm-seg-label'>3:</div>", unsafe_allow_html=True)
+                v3_min = vcols[1].number_input("Variance 3 min", value=v3_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_3_min")
+                vcols[2].markdown("-")
+                v3_max = vcols[3].number_input("Variance 3 max", value=v3_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_3_max")
+
+            with segment_col:
+                st.markdown("**Segment:**")
+                scols = st.columns([0.25, 0.35, 0.05, 0.35])
+                scols[0].markdown("<div class='rm-seg-label'>A:</div>", unsafe_allow_html=True)
+                a_min = scols[1].number_input("Segment A min", value=a_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_a_min")
+                scols[2].markdown("-")
+                a_max = scols[3].number_input("Segment A max", value=a_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_a_max")
+
+                scols = st.columns([0.25, 0.35, 0.05, 0.35])
+                scols[0].markdown("<div class='rm-seg-label'>B:</div>", unsafe_allow_html=True)
+                b_min = scols[1].number_input("Segment B min", value=b_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_b_min")
+                scols[2].markdown("-")
+                b_max = scols[3].number_input("Segment B max", value=b_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_b_max")
+
+                scols = st.columns([0.25, 0.35, 0.05, 0.35])
+                scols[0].markdown("<div class='rm-seg-label'>C:</div>", unsafe_allow_html=True)
+                c_min = scols[1].number_input("Segment C min", value=c_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_c_min")
+                scols[2].markdown("-")
+                c_max = scols[3].number_input("Segment C max", value=c_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_c_max")
+            st.markdown("</div>", unsafe_allow_html=True)
 
         st.subheader("🏭 Production Days per Month")
         prod_days    = params.get("production_days", {})
@@ -993,7 +1072,18 @@ elif page == "🔧 Global Settings":
             "cappings":        {"safety_stock_cap": safety_cap, "transit_time_cap": transit_cap, "shipping_interval_cap": shipping_cap, "Maximum Demand in % of Forecast": max_demand_pct},
             "cycle_stock":     {"calculation_methodology": cycle_method},
             "tolerance":       {"local": tol_local, "imported": tol_imported},
-            "rm_segmentation": params.get("rm_segmentation", {}),
+            "rm_segmentation": {
+                "variance": {
+                    "1": {"min": v1_min, "max": v1_max},
+                    "2": {"min": v2_min, "max": v2_max},
+                    "3": {"min": v3_min, "max": v3_max},
+                },
+                "segment": {
+                    "A": {"min": a_min, "max": a_max},
+                    "B": {"min": b_min, "max": b_max},
+                    "C": {"min": c_min, "max": c_max},
+                },
+            },
             "service_level_mapping": params.get("service_level_mapping", {}),
             "production_days": new_prod_days,
             "price_conversion": {"USD_value": usd_value},
@@ -2204,6 +2294,4 @@ elif page == "🔬 Dashboard 4":
         pd.DataFrame(param_data).style.format({"Value": lambda v: f"{v:,.3f}" if isinstance(v, float) else v}),
         use_container_width=True, height=680
     )
-
-
 
