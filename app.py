@@ -1569,7 +1569,7 @@ elif page == "📈 Dashboard 3":
     c1, c2 = st.columns(2)
 
     # ── Avg 8 Reasons DSI waterfall ───────────────────────────────────────
-    # Restarted from scratch to reflect the actual logic leading to Avg 8 Reasons (DSI):
+    # Reflects the logic leading to Avg 8 Reasons (DSI):
     #   Avg 8 Reasons (DSI) = Avg Cycle (DSI) + Avg Transit (DSI) + Avg Safety (DSI)
     # All values use the same ADS-weighted-average logic as the KPI row.
     with c1:
@@ -1586,7 +1586,7 @@ elif page == "📈 Dashboard 3":
                 return float(values.mean()) if len(values) else 0.0
             return float((values * weights).sum() / denom)
 
-        # Weighted-average source reason values shown in the calculation detail below.
+        # Weighted-average source reason values for the explanation panels below.
         r1_avg = w_avg_raw(fdf3, "R1 Information Cycle (DSI)")
         r2_avg = w_avg_raw(fdf3, "R2 Manufacturing Lot Size (DSI)")
         r3_avg = w_avg_raw(fdf3, "R3 Shipping Lot Size (DSI)")
@@ -1637,45 +1637,66 @@ elif page == "📈 Dashboard 3":
             showlegend=False,
         )
         st.plotly_chart(fig1, use_container_width=True)
-        st.caption(
-            "Waterfall logic: Avg 8 Reasons (DSI) is built from the same ADS-weighted averages used in the KPI: "
-            "Cycle Stock + Transit Stock + Safety Stock. Cycle Stock groups R1-R4, Transit Stock corresponds to R5, "
-            "and Safety Stock groups R6-R8. A small Reconciliation bar is shown only if the workbook's 8 Reasons (DSI) "
-            "does not exactly equal the sum of the three components due to rounding or source-calculation differences."
-        )
 
-        component_detail = pd.DataFrame([
-            {
-                "Stock bucket": "Cycle Stock",
-                "Reason descriptions": "R1 Information Cycle = review/order cycle stock; R2 Manufacturing Lot Size = manufacturing batch/lot stock; R3 Shipping Lot Size = shipment batch/lot stock; R4 Shipping Interval = stock required between shipments.",
-                "Inputs visualised": f"R1={r1_avg:.2f}, R2={r2_avg:.2f}, R3={r3_avg:.2f}, R4={r4_avg:.2f}",
-                "Detailed calculation": f"Waterfall uses ADS-weighted average of official Cycle (DSI): {cycle_avg_raw:.2f}. R1-R4 are shown as input drivers; the official Cycle (DSI) column already applies the app's cycle-stock calculation methodology.",
-                "Waterfall value (DSI)": round(cycle_avg_raw, 2),
-            },
-            {
-                "Stock bucket": "Transit Stock",
-                "Reason descriptions": "R5 Geography = geography / transit-time inventory required while material is in transit or constrained by supply lane geography.",
-                "Inputs visualised": f"R5={r5_avg:.2f}",
-                "Detailed calculation": f"Waterfall uses ADS-weighted average of official Transit (DSI): {transit_avg_raw:.2f}. R5 is the input driver for Transit Stock.",
-                "Waterfall value (DSI)": round(transit_avg_raw, 2),
-            },
-            {
-                "Stock bucket": "Safety Stock",
-                "Reason descriptions": "R6 Shipping Variation = shipping/lead-time variability; R7 Supply Variation = supply reliability variability; R8 Demand Variation = demand variability.",
-                "Inputs visualised": f"R6={r6_avg:.2f}, R7={r7_avg:.2f}, R8={r8_avg:.2f}",
-                "Detailed calculation": f"Safety logic is root-sum-square at row level: √(R6² + R7² + R8²). The waterfall uses ADS-weighted average of official Safety (DSI): {safety_avg_raw:.2f}. Illustrative calculation from weighted-average inputs: √({r6_avg:.2f}² + {r7_avg:.2f}² + {r8_avg:.2f}²) = {illustrative_safety_from_avg_components:.2f}.",
-                "Waterfall value (DSI)": round(safety_avg_raw, 2),
-            },
-            {
-                "Stock bucket": "Total",
-                "Reason descriptions": "Total 8 Reasons inventory target in days of supply.",
-                "Inputs visualised": "Cycle Stock + Transit Stock + Safety Stock (+ Reconciliation if needed)",
-                "Detailed calculation": f"Waterfall total uses ADS-weighted average of official 8 Reasons (DSI): {total_avg_raw:.2f}. Component sum = {subtotal_raw:.2f}; Reconciliation = {reconciliation_raw:.2f}.",
-                "Waterfall value (DSI)": round(total_avg_raw, 2),
-            },
-        ])
-        st.markdown("**Waterfall input components and calculations**")
-        st.dataframe(component_detail, use_container_width=True, hide_index=True)
+        st.markdown("**Waterfall components — inputs and calculations**")
+        with st.expander("🔵 Cycle Stock — R1 to R4", expanded=True):
+            st.markdown(f"""
+            **Waterfall value:** `{cycle_avg_raw:.2f} DSI`  
+            **Calculation used in the chart:** ADS-weighted average of the official **Cycle (DSI)** field.
+
+            **Input reasons shown one per line:**
+            - **R1 Information Cycle:** review / order-cycle stock. Weighted average input: `{r1_avg:.2f} DSI`.
+            - **R2 Manufacturing Lot Size:** manufacturing batch / lot-size stock. Weighted average input: `{r2_avg:.2f} DSI`.
+            - **R3 Shipping Lot Size:** shipment batch / container / shipping-lot stock. Weighted average input: `{r3_avg:.2f} DSI`.
+            - **R4 Shipping Interval:** stock required between shipment opportunities. Weighted average input: `{r4_avg:.2f} DSI`.
+
+            **Important:** Dashboard 3 uses the official aggregated **Cycle (DSI)** value so the waterfall reconciles to **Avg 8 Reasons (DSI)**. The R1-R4 lines above are the visible input drivers behind that bucket.
+            """)
+
+        with st.expander("🟠 Transit Stock — R5", expanded=True):
+            st.markdown(f"""
+            **Waterfall value:** `{transit_avg_raw:.2f} DSI`  
+            **Calculation used in the chart:** ADS-weighted average of the official **Transit (DSI)** field.
+
+            **Input reason:**
+            - **R5 Geography:** geography / lane / transit-time inventory required while material is in transit or constrained by supply route. Weighted average input: `{r5_avg:.2f} DSI`.
+            """)
+
+        with st.expander("🔴 Safety Stock — R6 to R8", expanded=True):
+            st.markdown(f"""
+            **Waterfall value:** `{safety_avg_raw:.2f} DSI`  
+            **Calculation used in the chart:** ADS-weighted average of the official **Safety (DSI)** field.
+
+            **Input reasons shown one per line:**
+            - **R6 Shipping Variation:** shipping / lead-time variability. Weighted average input: `{r6_avg:.2f} DSI`.
+            - **R7 Supply Variation:** supplier / supply reliability variability. Weighted average input: `{r7_avg:.2f} DSI`.
+            - **R8 Demand Variation:** customer demand variability. Weighted average input: `{r8_avg:.2f} DSI`.
+
+            **Safety-stock calculation logic:**  
+            Safety Stock is based on the root-sum-square approach:
+
+            `Safety Stock = √(R6² + R7² + R8²)`
+
+            **Illustration using the weighted-average displayed inputs:**  
+            `√({r6_avg:.2f}² + {r7_avg:.2f}² + {r8_avg:.2f}²) = {illustrative_safety_from_avg_components:.2f} DSI`
+
+            **Important:** this illustration may differ slightly from the waterfall value because Dashboard 3 uses the weighted average of the official row-level **Safety (DSI)** values to stay aligned with the KPI.
+            """)
+
+        with st.expander("⚫ Total and reconciliation", expanded=True):
+            st.markdown(f"""
+            **Waterfall total:** `{total_avg_raw:.2f} DSI`  
+            **Calculation used in the chart:** ADS-weighted average of the official **8 Reasons (DSI)** field.
+
+            **Component check:**
+            - Cycle Stock: `{cycle_avg_raw:.2f} DSI`
+            - Transit Stock: `{transit_avg_raw:.2f} DSI`
+            - Safety Stock: `{safety_avg_raw:.2f} DSI`
+            - Component sum: `{subtotal_raw:.2f} DSI`
+            - Reconciliation to official Avg 8 Reasons DSI: `{reconciliation_raw:.2f} DSI`
+
+            A **Reconciliation** bar appears only when the official **Avg 8 Reasons (DSI)** value does not exactly equal the visible component sum, usually because of rounding or source-calculation differences.
+            """)
 
     # ── Stacked DSI by INCO term ──────────────────────────────────────────
     with c2:
@@ -2064,7 +2085,7 @@ elif page == "🔬 Dashboard 4":
     # ── 8 Reasons DSI waterfall ───────────────────────────────────────────────
     st.markdown("<div class='section-header'>📉 8 Reasons DSI Waterfall</div>", unsafe_allow_html=True)
 
-    # Restarted from scratch to reflect the actual logic leading to 8 Reasons (DSI):
+    # Reflects the actual logic leading to 8 Reasons (DSI):
     #   8 Reasons (DSI) = Cycle (DSI) + Transit (DSI) + Safety (DSI)
     wf_labels = ["Cycle Stock", "Transit Stock", "Safety Stock"]
     wf_values = [cycle_dsi, transit_dsi, safety_dsi]
@@ -2101,45 +2122,66 @@ elif page == "🔬 Dashboard 4":
         showlegend=False,
     )
     st.plotly_chart(fig_wf, use_container_width=True)
-    st.caption(
-        "Waterfall logic: 8 Reasons (DSI) is built from Cycle Stock + Transit Stock + Safety Stock. "
-        "Cycle Stock groups R1-R4, Transit Stock corresponds to R5, and Safety Stock groups R6-R8. "
-        "A small Reconciliation bar is shown only if the official 8 Reasons (DSI) value does not exactly equal "
-        "the sum of the three components due to rounding or source-calculation differences."
-    )
 
-    component_detail = pd.DataFrame([
-        {
-            "Stock bucket": "Cycle Stock",
-            "Reason descriptions": "R1 Information Cycle = review/order cycle stock; R2 Manufacturing Lot Size = manufacturing batch/lot stock; R3 Shipping Lot Size = shipment batch/lot stock; R4 Shipping Interval = stock required between shipments.",
-            "Inputs visualised": f"R1={r1:.2f}, R2={r2:.2f}, R3={r3:.2f}, R4={r4:.2f}",
-            "Detailed calculation": f"Waterfall uses official Cycle (DSI) from final output: {cycle_dsi:.2f}. R1-R4 are shown as input drivers; the official Cycle (DSI) column already applies the app's cycle-stock calculation methodology.",
-            "Waterfall value (DSI)": round(cycle_dsi, 2),
-        },
-        {
-            "Stock bucket": "Transit Stock",
-            "Reason descriptions": "R5 Geography = geography / transit-time inventory required while material is in transit or constrained by supply lane geography.",
-            "Inputs visualised": f"R5={r5:.2f}",
-            "Detailed calculation": f"Waterfall uses official Transit (DSI) from final output: {transit_dsi:.2f}. R5 is the input driver for Transit Stock.",
-            "Waterfall value (DSI)": round(transit_dsi, 2),
-        },
-        {
-            "Stock bucket": "Safety Stock",
-            "Reason descriptions": "R6 Shipping Variation = shipping/lead-time variability; R7 Supply Variation = supply reliability variability; R8 Demand Variation = demand variability.",
-            "Inputs visualised": f"R6={r6:.2f}, R7={r7:.2f}, R8={r8:.2f}",
-            "Detailed calculation": f"Safety logic is root-sum-square: √(R6² + R7² + R8²) = √({r6:.2f}² + {r7:.2f}² + {r8:.2f}²) = {illustrative_safety:.2f}. Waterfall uses official Safety (DSI): {safety_dsi:.2f}.",
-            "Waterfall value (DSI)": round(safety_dsi, 2),
-        },
-        {
-            "Stock bucket": "Total",
-            "Reason descriptions": "Total 8 Reasons inventory target in days of supply.",
-            "Inputs visualised": "Cycle Stock + Transit Stock + Safety Stock (+ Reconciliation if needed)",
-            "Detailed calculation": f"Waterfall total uses official 8 Reasons (DSI): {total_dsi:.2f}. Component sum = {(cycle_dsi + transit_dsi + safety_dsi):.2f}; Reconciliation = {reconciliation:.2f}.",
-            "Waterfall value (DSI)": round(total_dsi, 2),
-        },
-    ])
-    st.markdown("**Waterfall input components and calculations**")
-    st.dataframe(component_detail, use_container_width=True, hide_index=True)
+    st.markdown("**Waterfall components — inputs and calculations**")
+    with st.expander("🔵 Cycle Stock — R1 to R4", expanded=True):
+        st.markdown(f"""
+        **Waterfall value:** `{cycle_dsi:.2f} DSI`  
+        **Calculation used in the chart:** official **Cycle (DSI)** from final output.
+
+        **Input reasons shown one per line:**
+        - **R1 Information Cycle:** review / order-cycle stock. Input: `{r1:.2f} DSI`.
+        - **R2 Manufacturing Lot Size:** manufacturing batch / lot-size stock. Input: `{r2:.2f} DSI`.
+        - **R3 Shipping Lot Size:** shipment batch / container / shipping-lot stock. Input: `{r3:.2f} DSI`.
+        - **R4 Shipping Interval:** stock required between shipment opportunities. Input: `{r4:.2f} DSI`.
+
+        **Important:** the waterfall uses the official **Cycle (DSI)** value so it reconciles to the official **8 Reasons (DSI)**. The R1-R4 lines above are the visible input drivers behind that bucket.
+        """)
+
+    with st.expander("🟠 Transit Stock — R5", expanded=True):
+        st.markdown(f"""
+        **Waterfall value:** `{transit_dsi:.2f} DSI`  
+        **Calculation used in the chart:** official **Transit (DSI)** from final output.
+
+        **Input reason:**
+        - **R5 Geography:** geography / lane / transit-time inventory required while material is in transit or constrained by supply route. Input: `{r5:.2f} DSI`.
+        """)
+
+    with st.expander("🔴 Safety Stock — R6 to R8", expanded=True):
+        st.markdown(f"""
+        **Waterfall value:** `{safety_dsi:.2f} DSI`  
+        **Calculation used in the chart:** official **Safety (DSI)** from final output.
+
+        **Input reasons shown one per line:**
+        - **R6 Shipping Variation:** shipping / lead-time variability. Input: `{r6:.2f} DSI`.
+        - **R7 Supply Variation:** supplier / supply reliability variability. Input: `{r7:.2f} DSI`.
+        - **R8 Demand Variation:** customer demand variability. Input: `{r8:.2f} DSI`.
+
+        **Safety-stock calculation logic:**  
+        Safety Stock is based on the root-sum-square approach:
+
+        `Safety Stock = √(R6² + R7² + R8²)`
+
+        **Calculation using selected-material inputs:**  
+        `√({r6:.2f}² + {r7:.2f}² + {r8:.2f}²) = {illustrative_safety:.2f} DSI`
+
+        If the calculated value differs from the official **Safety (DSI)** field, the waterfall keeps the official field so the chart reconciles to **8 Reasons (DSI)**.
+        """)
+
+    with st.expander("⚫ Total and reconciliation", expanded=True):
+        st.markdown(f"""
+        **Waterfall total:** `{total_dsi:.2f} DSI`  
+        **Calculation used in the chart:** official **8 Reasons (DSI)** from final output.
+
+        **Component check:**
+        - Cycle Stock: `{cycle_dsi:.2f} DSI`
+        - Transit Stock: `{transit_dsi:.2f} DSI`
+        - Safety Stock: `{safety_dsi:.2f} DSI`
+        - Component sum: `{(cycle_dsi + transit_dsi + safety_dsi):.2f} DSI`
+        - Reconciliation to official 8 Reasons DSI: `{reconciliation:.2f} DSI`
+
+        A **Reconciliation** bar appears only when the official **8 Reasons (DSI)** value does not exactly equal the visible component sum, usually because of rounding or source-calculation differences.
+        """)
 
     # ── R1–R8 detailed cards ──────────────────────────────────────────────────
     st.markdown("<div class='section-header'>📋 Detailed R1–R8 Calculations</div>", unsafe_allow_html=True)
