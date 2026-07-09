@@ -934,13 +934,11 @@ elif page == "🔧 Global Settings":
     config   = gp_class.get_global_config()
     params   = config["global_parameters"][0]
 
-    # Defaults shown in the RM Segmentation image:
-    # Variance classes: 1 = 0-41, 2 = 41-60, 3 = 60-100
-    # ABC segments:     A = 0-80, B = 80-96, C = 96-100
+    # RM Segmentation defaults from the requested Global Settings panel.
     rm_seg_params = params.get("rm_segmentation", {}) or {}
 
     def _rm_range(section_name, band_name, default_min, default_max):
-        """Read RM segmentation ranges from old/new config shapes, with image defaults."""
+        """Read RM segmentation ranges from old/new config shapes, with requested defaults."""
         section = rm_seg_params.get(section_name, {}) or {}
         value = section.get(str(band_name), section.get(band_name, None))
         if isinstance(value, dict):
@@ -988,32 +986,24 @@ elif page == "🔧 Global Settings":
 
         st.subheader("📦 RM Segmentation")
         st.caption("Configure the variance bands and ABC segment percentage thresholds used by RM segmentation.")
-        rm_box_style = """
-        <style>
-        .rm-seg-box {border:1px solid #d1d5db;border-radius:10px;padding:14px;margin-bottom:8px;background:#ffffff;}
-        .rm-seg-label {font-weight:700;margin-top:0.4rem;}
-        </style>
-        """
-        st.markdown(rm_box_style, unsafe_allow_html=True)
         with st.container():
-            st.markdown("<div class='rm-seg-box'>", unsafe_allow_html=True)
             variance_col, segment_col = st.columns(2)
             with variance_col:
                 st.markdown("**Variance:**")
                 vcols = st.columns([0.25, 0.35, 0.05, 0.35])
-                vcols[0].markdown("<div class='rm-seg-label'>1:</div>", unsafe_allow_html=True)
+                vcols[0].markdown("**1:**")
                 v1_min = vcols[1].number_input("Variance 1 min", value=v1_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_1_min")
                 vcols[2].markdown("-")
                 v1_max = vcols[3].number_input("Variance 1 max", value=v1_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_1_max")
 
                 vcols = st.columns([0.25, 0.35, 0.05, 0.35])
-                vcols[0].markdown("<div class='rm-seg-label'>2:</div>", unsafe_allow_html=True)
+                vcols[0].markdown("**2:**")
                 v2_min = vcols[1].number_input("Variance 2 min", value=v2_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_2_min")
                 vcols[2].markdown("-")
                 v2_max = vcols[3].number_input("Variance 2 max", value=v2_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_2_max")
 
                 vcols = st.columns([0.25, 0.35, 0.05, 0.35])
-                vcols[0].markdown("<div class='rm-seg-label'>3:</div>", unsafe_allow_html=True)
+                vcols[0].markdown("**3:**")
                 v3_min = vcols[1].number_input("Variance 3 min", value=v3_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_3_min")
                 vcols[2].markdown("-")
                 v3_max = vcols[3].number_input("Variance 3 max", value=v3_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_var_3_max")
@@ -1021,23 +1011,22 @@ elif page == "🔧 Global Settings":
             with segment_col:
                 st.markdown("**Segment:**")
                 scols = st.columns([0.25, 0.35, 0.05, 0.35])
-                scols[0].markdown("<div class='rm-seg-label'>A:</div>", unsafe_allow_html=True)
+                scols[0].markdown("**A:**")
                 a_min = scols[1].number_input("Segment A min", value=a_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_a_min")
                 scols[2].markdown("-")
                 a_max = scols[3].number_input("Segment A max", value=a_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_a_max")
 
                 scols = st.columns([0.25, 0.35, 0.05, 0.35])
-                scols[0].markdown("<div class='rm-seg-label'>B:</div>", unsafe_allow_html=True)
+                scols[0].markdown("**B:**")
                 b_min = scols[1].number_input("Segment B min", value=b_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_b_min")
                 scols[2].markdown("-")
                 b_max = scols[3].number_input("Segment B max", value=b_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_b_max")
 
                 scols = st.columns([0.25, 0.35, 0.05, 0.35])
-                scols[0].markdown("<div class='rm-seg-label'>C:</div>", unsafe_allow_html=True)
+                scols[0].markdown("**C:**")
                 c_min = scols[1].number_input("Segment C min", value=c_min_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_c_min")
                 scols[2].markdown("-")
                 c_max = scols[3].number_input("Segment C max", value=c_max_default, min_value=0.0, max_value=100.0, step=1.0, label_visibility="collapsed", key="rm_seg_c_max")
-            st.markdown("</div>", unsafe_allow_html=True)
 
         st.subheader("🏭 Production Days per Month")
         prod_days    = params.get("production_days", {})
@@ -1579,40 +1568,46 @@ elif page == "📈 Dashboard 3":
 
     c1, c2 = st.columns(2)
 
-    # ── R1–R8 weighted-average waterfall breakdown ─────────────────────────
-    # Mirrors Dashboard 4's R1–R8 waterfall, but uses the Dashboard 3 filtered
-    # population and weighted-average DSI values instead of a single material.
+    # ── R1–R8 weighted-average grouped waterfall breakdown ────────────────
+    # Correct subtotal logic:
+    #   Cycle  = R1 + R2 + R3 + R4
+    #   Transit = R5
+    #   Safety = R6 + R7 + R8
+    #   Total  = Cycle + Transit + Safety
     with c1:
         st.markdown("**R1–R8 Waterfall Breakdown**")
 
         r_vals = [w_avg(fdf3, c) for c in R_COLS]
         r1, r2, r3, r4, r5, r6, r7, r8 = r_vals
-        cycle_dsi   = w_avg(fdf3, "Cycle (DSI)")
-        transit_dsi = w_avg(fdf3, "Transit (DSI)")
-        safety_dsi  = w_avg(fdf3, "Safety (DSI)")
-        total_dsi   = w_avg(fdf3, "8 Reasons (DSI)")
+        cycle_dsi   = round(r1 + r2 + r3 + r4, 2)
+        transit_dsi = round(r5, 2)
+        safety_dsi  = round(r6 + r7 + r8, 2)
+        total_dsi   = round(cycle_dsi + transit_dsi + safety_dsi, 2)
 
-        wf_labels  = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
-                      "= Cycle", "R5 Geography", "= Transit", "R6 Ship Var", "R7 Supply Var",
-                      "R8 Demand Var", "= Safety", "TOTAL"]
-        wf_vals    = [r1, r2, r3, r4, cycle_dsi, r5, transit_dsi, r6, r7, r8, safety_dsi, total_dsi]
-        wf_measure = ["relative", "relative", "relative", "relative", "total",
-                      "relative", "total", "relative", "relative", "relative", "total", "total"]
+        wf_labels = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
+                     "= Cycle", "R5 Geography", "= Transit", "R6 Ship Var", "R7 Supply Var",
+                     "R8 Demand Var", "= Safety", "TOTAL"]
+        wf_values = [r1, r2, r3, r4, cycle_dsi, r5, transit_dsi, r6, r7, r8, safety_dsi, total_dsi]
+        # Floating-bar bases create true group subtotals instead of Plotly's cumulative totals.
+        wf_bases  = [0, r1, r1 + r2, r1 + r2 + r3, 0,
+                     0, 0,
+                     0, r6, r6 + r7, 0,
+                     0]
+        wf_colors = ["#3b82f6", "#3b82f6", "#3b82f6", "#3b82f6", "#1d4ed8",
+                     "#f97316", "#ea580c", "#ef4444", "#ef4444", "#ef4444",
+                     "#dc2626", "#0a192f"]
 
-        fig1 = go.Figure(go.Waterfall(
-            name="DSI", orientation="v",
-            measure=wf_measure, x=wf_labels, y=wf_vals,
-            text=[f"{v:.2f}" for v in wf_vals],
+        fig1 = go.Figure(go.Bar(
+            x=wf_labels, y=wf_values, base=wf_bases,
+            marker_color=wf_colors,
+            text=[f"{v:.2f}" for v in wf_values],
             textposition="outside",
-            connector=dict(line=dict(color="#e2e8f0", width=1, dash="dot")),
-            increasing=dict(marker=dict(color="#3b82f6")),
-            decreasing=dict(marker=dict(color="#f59e0b")),
-            totals=dict(marker=dict(color="#0a192f")),
+            hovertemplate="%{x}<br>DSI: %{y:.2f}<extra></extra>",
         ))
         fig1.update_layout(
             height=380, margin=dict(l=10, r=10, t=20, b=10),
             plot_bgcolor="white", paper_bgcolor="white",
-            yaxis=dict(gridcolor="#f1f5f9", title="DSI (Days of Supply Inventory)"),
+            yaxis=dict(gridcolor="#f1f5f9", title="DSI (Days of Supply Inventory)", rangemode="tozero"),
             xaxis=dict(tickfont=dict(size=10, family="IBM Plex Mono")),
             font=dict(family="IBM Plex Sans"),
             showlegend=False,
@@ -2003,32 +1998,43 @@ elif page == "🔬 Dashboard 4":
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Waterfall chart ───────────────────────────────────────────────────────
+    # ── Corrected grouped waterfall chart ─────────────────────────────────────
     st.markdown("<div class='section-header'>📉 R1–R8 Waterfall Breakdown</div>", unsafe_allow_html=True)
 
-    wf_labels  = ["R1 Info Cycle","R2 Mfg Lot","R3 Ship Lot","R4 Ship Interval",
-                  "= Cycle","R5 Geography","= Transit","R6 Ship Var","R7 Supply Var",
-                  "R8 Demand Var","= Safety","TOTAL"]
-    wf_vals    = [r1, r2, r3, r4, cycle_dsi, r5, transit_dsi, r6, r7, r8, safety_dsi, total_dsi]
-    wf_measure = ["relative","relative","relative","relative","total",
-                  "relative","total","relative","relative","relative","total","total"]
-    wf_colors  = ["#3b82f6","#3b82f6","#3b82f6","#3b82f6","#1d4ed8",
-                  "#f97316","#ea580c","#ef4444","#ef4444","#ef4444","#dc2626","#0a192f"]
+    # Use explicit component sums for waterfall subtotals so the chart is auditable:
+    #   Cycle  = R1 + R2 + R3 + R4
+    #   Transit = R5
+    #   Safety = R6 + R7 + R8
+    #   Total  = Cycle + Transit + Safety
+    wf_cycle_dsi   = round(r1 + r2 + r3 + r4, 2)
+    wf_transit_dsi = round(r5, 2)
+    wf_safety_dsi  = round(r6 + r7 + r8, 2)
+    wf_total_dsi   = round(wf_cycle_dsi + wf_transit_dsi + wf_safety_dsi, 2)
 
-    fig_wf = go.Figure(go.Waterfall(
-        name="DSI", orientation="v",
-        measure=wf_measure, x=wf_labels, y=wf_vals,
-        text=[f"{v:.2f}" for v in wf_vals],
+    wf_labels = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
+                 "= Cycle", "R5 Geography", "= Transit", "R6 Ship Var", "R7 Supply Var",
+                 "R8 Demand Var", "= Safety", "TOTAL"]
+    wf_values = [r1, r2, r3, r4, wf_cycle_dsi, r5, wf_transit_dsi, r6, r7, r8, wf_safety_dsi, wf_total_dsi]
+    # Floating-bar bases create true group subtotals instead of cumulative Plotly Waterfall totals.
+    wf_bases  = [0, r1, r1 + r2, r1 + r2 + r3, 0,
+                 0, 0,
+                 0, r6, r6 + r7, 0,
+                 0]
+    wf_colors = ["#3b82f6", "#3b82f6", "#3b82f6", "#3b82f6", "#1d4ed8",
+                 "#f97316", "#ea580c", "#ef4444", "#ef4444", "#ef4444",
+                 "#dc2626", "#0a192f"]
+
+    fig_wf = go.Figure(go.Bar(
+        x=wf_labels, y=wf_values, base=wf_bases,
+        marker_color=wf_colors,
+        text=[f"{v:.2f}" for v in wf_values],
         textposition="outside",
-        connector=dict(line=dict(color="#e2e8f0", width=1, dash="dot")),
-        increasing=dict(marker=dict(color="#3b82f6")),
-        decreasing=dict(marker=dict(color="#f59e0b")),
-        totals=dict(marker=dict(color="#0a192f")),
+        hovertemplate="%{x}<br>DSI: %{y:.2f}<extra></extra>",
     ))
     fig_wf.update_layout(
         height=380, margin=dict(l=10,r=10,t=20,b=10),
         plot_bgcolor="white", paper_bgcolor="white",
-        yaxis=dict(gridcolor="#f1f5f9", title="DSI (Days of Supply Inventory)"),
+        yaxis=dict(gridcolor="#f1f5f9", title="DSI (Days of Supply Inventory)", rangemode="tozero"),
         xaxis=dict(tickfont=dict(size=10, family="IBM Plex Mono")),
         font=dict(family="IBM Plex Sans"),
         showlegend=False,
@@ -2294,4 +2300,6 @@ elif page == "🔬 Dashboard 4":
         pd.DataFrame(param_data).style.format({"Value": lambda v: f"{v:,.3f}" if isinstance(v, float) else v}),
         use_container_width=True, height=680
     )
+
+
 
