@@ -1568,37 +1568,37 @@ elif page == "📈 Dashboard 3":
 
     c1, c2 = st.columns(2)
 
-    # ── R1–R8 weighted-average running waterfall breakdown ────────────────
-    # Correct subtotal logic and running display:
-    #   Cycle  = R1 + R2 + R3 + R4
-    #   R5 is displayed from the Cycle subtotal
-    #   R6-R8 are displayed from Cycle + R5
-    #   Safety subtotal starts at Cycle + R5 and has height R6 + R7 + R8
-    #   Total  = R1 + R2 + R3 + R4 + R5 + R6 + R7 + R8
+    # ── R1–R8 weighted-average bridge / waterfall breakdown ────────────────
+    # Logic:
+    #   Cycle Stock  = max(R1, R2, R3, R4)
+    #   Transit Stock = R5, displayed from the Cycle Stock subtotal level
+    #   Safety Stock  = sqrt(R6² + R7² + R8²), displayed from the Cycle Stock subtotal level
+    #   Total         = Cycle Stock + Transit Stock + Safety Stock
     with c1:
         st.markdown("**R1–R8 Waterfall Breakdown**")
 
         r_vals = [w_avg(fdf3, c) for c in R_COLS]
         r1, r2, r3, r4, r5, r6, r7, r8 = r_vals
-        cycle_dsi = round(r1 + r2 + r3 + r4, 2)
-        safety_dsi = round(r6 + r7 + r8, 2)
-        cycle_r5_dsi = round(cycle_dsi + r5, 2)
-        total_dsi = round(r1 + r2 + r3 + r4 + r5 + r6 + r7 + r8, 2)
+        cycle_dsi = round(max(r1, r2, r3, r4), 2)
+        transit_dsi = round(r5, 2)
+        safety_dsi = round((r6**2 + r7**2 + r8**2) ** 0.5, 2)
+        total_dsi = round(cycle_dsi + transit_dsi + safety_dsi, 2)
 
         wf_labels = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
-                     "= Cycle", "R5 Geography", "R6 Ship Var", "R7 Supply Var",
-                     "R8 Demand Var", "= Safety", "TOTAL"]
-        wf_values = [r1, r2, r3, r4, cycle_dsi, r5, r6, r7, r8, safety_dsi, total_dsi]
+                     "= Cycle Stock", "R5 Transit Stock", "R6 Ship Var", "R7 Supply Var",
+                     "R8 Demand Var", "= Safety Stock", "TOTAL"]
+        wf_values = [r1, r2, r3, r4, cycle_dsi, transit_dsi, r6, r7, r8, safety_dsi, total_dsi]
         wf_text = [f"{r1:.2f}", f"{r2:.2f}", f"{r3:.2f}", f"{r4:.2f}", f"{cycle_dsi:.2f}",
-                   f"{r5:.2f}", f"{r6:.2f}", f"{r7:.2f}", f"{r8:.2f}",
+                   f"{transit_dsi:.2f}", f"{r6:.2f}", f"{r7:.2f}", f"{r8:.2f}",
                    f"{safety_dsi:.2f}", f"{total_dsi:.2f}"]
-        # Floating-bar bases make each reason start from the previous subtotal/running level.
-        # Safety is intentionally a floating subtotal from Cycle + R5.
-        # TOTAL is anchored at zero and explicitly equals the sum of R1 through R8.
-        wf_bases = [0, r1, r1 + r2, r1 + r2 + r3, 0,
+        # R1-R4 and R6-R8 show the source components. Cycle is max(R1-R4), not their sum.
+        # Transit and Safety are both floating from the Cycle Stock subtotal level.
+        # TOTAL is anchored at zero and equals Cycle + Transit + Safety.
+        wf_bases = [0, 0, 0, 0,
+                    0,
                     cycle_dsi,
-                    cycle_r5_dsi, cycle_r5_dsi + r6, cycle_r5_dsi + r6 + r7,
-                    cycle_r5_dsi,
+                    cycle_dsi, cycle_dsi, cycle_dsi,
+                    cycle_dsi,
                     0]
         wf_colors = ["#3b82f6", "#3b82f6", "#3b82f6", "#3b82f6", "#1d4ed8",
                      "#f97316", "#ef4444", "#ef4444", "#ef4444",
@@ -1609,7 +1609,7 @@ elif page == "📈 Dashboard 3":
             marker_color=wf_colors,
             text=wf_text,
             textposition="outside",
-            hovertemplate="%{x}<br>Contribution/subtotal: %{y:.2f} DSI<br>Starts at: %{base:.2f} DSI<extra></extra>",
+            hovertemplate="%{x}<br>Value: %{y:.2f} DSI<br>Starts at: %{base:.2f} DSI<extra></extra>",
         ))
         fig1.update_layout(
             height=380, margin=dict(l=10, r=10, t=20, b=10),
@@ -1620,6 +1620,7 @@ elif page == "📈 Dashboard 3":
             showlegend=False,
         )
         st.plotly_chart(fig1, use_container_width=True)
+        st.caption("Waterfall logic: Cycle Stock = max(R1, R2, R3, R4); Transit Stock = R5 and starts at the Cycle Stock level; Safety Stock = √(R6² + R7² + R8²) and starts at the Cycle Stock level; Total = Cycle Stock + Transit Stock + Safety Stock.")
 
     # ── Stacked DSI by INCO term ──────────────────────────────────────────
     with c2:
@@ -2005,34 +2006,34 @@ elif page == "🔬 Dashboard 4":
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Corrected running grouped waterfall chart ─────────────────────────────
+    # ── Corrected bridge / waterfall chart ───────────────────────────────────
     st.markdown("<div class='section-header'>📉 R1–R8 Waterfall Breakdown</div>", unsafe_allow_html=True)
 
-    # Correct subtotal logic and running display:
-    #   Cycle  = R1 + R2 + R3 + R4
-    #   R5 is displayed from the Cycle subtotal
-    #   R6-R8 are displayed from Cycle + R5
-    #   Safety subtotal starts at Cycle + R5 and has height R6 + R7 + R8
-    #   Total  = R1 + R2 + R3 + R4 + R5 + R6 + R7 + R8
-    wf_cycle_dsi = round(r1 + r2 + r3 + r4, 2)
-    wf_safety_dsi = round(r6 + r7 + r8, 2)
-    wf_cycle_r5_dsi = round(wf_cycle_dsi + r5, 2)
-    wf_total_dsi = round(r1 + r2 + r3 + r4 + r5 + r6 + r7 + r8, 2)
+    # Logic:
+    #   Cycle Stock  = max(R1, R2, R3, R4)
+    #   Transit Stock = R5, displayed from the Cycle Stock subtotal level
+    #   Safety Stock  = sqrt(R6² + R7² + R8²), displayed from the Cycle Stock subtotal level
+    #   Total         = Cycle Stock + Transit Stock + Safety Stock
+    wf_cycle_dsi = round(max(r1, r2, r3, r4), 2)
+    wf_transit_dsi = round(r5, 2)
+    wf_safety_dsi = round((r6**2 + r7**2 + r8**2) ** 0.5, 2)
+    wf_total_dsi = round(wf_cycle_dsi + wf_transit_dsi + wf_safety_dsi, 2)
 
     wf_labels = ["R1 Info Cycle", "R2 Mfg Lot", "R3 Ship Lot", "R4 Ship Interval",
-                 "= Cycle", "R5 Geography", "R6 Ship Var", "R7 Supply Var",
-                 "R8 Demand Var", "= Safety", "TOTAL"]
-    wf_values = [r1, r2, r3, r4, wf_cycle_dsi, r5, r6, r7, r8, wf_safety_dsi, wf_total_dsi]
+                 "= Cycle Stock", "R5 Transit Stock", "R6 Ship Var", "R7 Supply Var",
+                 "R8 Demand Var", "= Safety Stock", "TOTAL"]
+    wf_values = [r1, r2, r3, r4, wf_cycle_dsi, wf_transit_dsi, r6, r7, r8, wf_safety_dsi, wf_total_dsi]
     wf_text = [f"{r1:.2f}", f"{r2:.2f}", f"{r3:.2f}", f"{r4:.2f}", f"{wf_cycle_dsi:.2f}",
-               f"{r5:.2f}", f"{r6:.2f}", f"{r7:.2f}", f"{r8:.2f}",
+               f"{wf_transit_dsi:.2f}", f"{r6:.2f}", f"{r7:.2f}", f"{r8:.2f}",
                f"{wf_safety_dsi:.2f}", f"{wf_total_dsi:.2f}"]
-    # Floating-bar bases make each reason start from the previous subtotal/running level.
-    # Safety is intentionally a floating subtotal from Cycle + R5.
-    # TOTAL is anchored at zero and explicitly equals the sum of R1 through R8.
-    wf_bases = [0, r1, r1 + r2, r1 + r2 + r3, 0,
+    # R1-R4 and R6-R8 show the source components. Cycle is max(R1-R4), not their sum.
+    # Transit and Safety are both floating from the Cycle Stock subtotal level.
+    # TOTAL is anchored at zero and equals Cycle + Transit + Safety.
+    wf_bases = [0, 0, 0, 0,
+                0,
                 wf_cycle_dsi,
-                wf_cycle_r5_dsi, wf_cycle_r5_dsi + r6, wf_cycle_r5_dsi + r6 + r7,
-                wf_cycle_r5_dsi,
+                wf_cycle_dsi, wf_cycle_dsi, wf_cycle_dsi,
+                wf_cycle_dsi,
                 0]
     wf_colors = ["#3b82f6", "#3b82f6", "#3b82f6", "#3b82f6", "#1d4ed8",
                  "#f97316", "#ef4444", "#ef4444", "#ef4444",
@@ -2043,7 +2044,7 @@ elif page == "🔬 Dashboard 4":
         marker_color=wf_colors,
         text=wf_text,
         textposition="outside",
-        hovertemplate="%{x}<br>Contribution/subtotal: %{y:.2f} DSI<br>Starts at: %{base:.2f} DSI<extra></extra>",
+        hovertemplate="%{x}<br>Value: %{y:.2f} DSI<br>Starts at: %{base:.2f} DSI<extra></extra>",
     ))
     fig_wf.update_layout(
         height=380, margin=dict(l=10,r=10,t=20,b=10),
@@ -2054,6 +2055,7 @@ elif page == "🔬 Dashboard 4":
         showlegend=False,
     )
     st.plotly_chart(fig_wf, use_container_width=True)
+    st.caption("Waterfall logic: Cycle Stock = max(R1, R2, R3, R4); Transit Stock = R5 and starts at the Cycle Stock level; Safety Stock = √(R6² + R7² + R8²) and starts at the Cycle Stock level; Total = Cycle Stock + Transit Stock + Safety Stock.")
 
     # ── R1–R8 detailed cards ──────────────────────────────────────────────────
     st.markdown("<div class='section-header'>📋 Detailed R1–R8 Calculations</div>", unsafe_allow_html=True)
