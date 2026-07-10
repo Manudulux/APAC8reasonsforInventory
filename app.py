@@ -3,9 +3,6 @@ import pandas as pd
 import base64
 import os
 import glob
-import json
-import pickle
-import re
 from io import BytesIO
 
 # ── Page config ────────────────────────────────────────────────────────────────
@@ -55,27 +52,12 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 # These files are written on the Streamlit server after an admin runs the final
 # 8 Reasons calculation. They are then automatically loaded for every user so
 # dashboards can be opened without repeating the admin pipeline.
-PERSIST_ROOT = os.path.join(APP_DIR, "server_outputs")
-PLANT_ROOT = os.path.join(PERSIST_ROOT, "plants")
-PLANT_REGISTRY_FILE = os.path.join(PLANT_ROOT, "plants.json")
-os.makedirs(PLANT_ROOT, exist_ok=True)
-
-# Configured after plant selection.
-PERSIST_DIR = None
-PERSISTED_FILES = {}
-PLANT_STATE_FILE = None
-PLANT_CONFIG_FILE = None
-
-PLANT_SCOPED_SESSION_KEYS = [
-    "validated_data", "intermediate_data", "rm_seg_b64",
-    "final_output_b64", "consumption_merged_b64", "rm_seg_merged_b64",
-    "_local_files",
-]
-
-PERSISTED_FILE_NAMES = {
-    "final_output_b64": "8Reasons_Final_Output.xlsx",
-    "consumption_merged_b64": "Consumption_Merged.xlsx",
-    "rm_seg_merged_b64": "RM_Segmentation_Merged.xlsx",
+PERSIST_DIR = os.path.join(APP_DIR, "server_outputs")
+os.makedirs(PERSIST_DIR, exist_ok=True)
+PERSISTED_FILES = {
+    "final_output_b64": os.path.join(PERSIST_DIR, "8Reasons_Final_Output.xlsx"),
+    "consumption_merged_b64": os.path.join(PERSIST_DIR, "Consumption_Merged.xlsx"),
+    "rm_seg_merged_b64": os.path.join(PERSIST_DIR, "RM_Segmentation_Merged.xlsx"),
 }
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -122,113 +104,20 @@ def scan_local_files(directory: str) -> dict:
     return found
 
 
-def sanitize_plant_slug(plant_name: str) -> str:
-    """Create a stable folder-safe slug for a plant name."""
-    slug = re.sub(r"[^A-Za-z0-9_-]+", "_", str(plant_name).strip()).strip("_")
-    return slug or "plant"
-
-
-def load_plant_registry() -> list:
-    """Return configured plants. Aurangabad is seeded by default."""
-    default_plants = ["Aurangabad"]
-    if not os.path.isfile(PLANT_REGISTRY_FILE):
-        os.makedirs(os.path.dirname(PLANT_REGISTRY_FILE), exist_ok=True)
-        with open(PLANT_REGISTRY_FILE, "w", encoding="utf-8") as f:
-            json.dump(default_plants, f, indent=2)
-        return default_plants
-    try:
-        with open(PLANT_REGISTRY_FILE, "r", encoding="utf-8") as f:
-            plants = json.load(f)
-        plants = [str(p).strip() for p in plants if str(p).strip()]
-        return plants or default_plants
-    except Exception:
-        return default_plants
-
-
-def save_plant_registry(plants: list):
-    clean = []
-    for p in plants:
-        name = str(p).strip()
-        if name and name not in clean:
-            clean.append(name)
-    if "Aurangabad" not in clean:
-        clean.insert(0, "Aurangabad")
-    os.makedirs(os.path.dirname(PLANT_REGISTRY_FILE), exist_ok=True)
-    with open(PLANT_REGISTRY_FILE, "w", encoding="utf-8") as f:
-        json.dump(clean, f, indent=2)
-    return clean
-
-
-def current_plant() -> str:
-    return st.session_state.get("active_plant", "")
-
-
-def current_plant_slug() -> str:
-    return sanitize_plant_slug(current_plant())
-
-
-def configure_active_plant_paths():
-    """Configure persistence globals for the selected plant."""
-    global PERSIST_DIR, PERSISTED_FILES, PLANT_STATE_FILE, PLANT_CONFIG_FILE
-    plant = current_plant()
-    if not plant:
-        return
-    plant_dir = os.path.join(PLANT_ROOT, sanitize_plant_slug(plant))
-    PERSIST_DIR = os.path.join(plant_dir, "outputs")
-    os.makedirs(PERSIST_DIR, exist_ok=True)
-    PERSISTED_FILES = {k: os.path.join(PERSIST_DIR, v) for k, v in PERSISTED_FILE_NAMES.items()}
-    PLANT_STATE_FILE = os.path.join(plant_dir, "session_state.pkl")
-    PLANT_CONFIG_FILE = os.path.join(plant_dir, "global_settings.json")
-
-
-def reset_plant_scoped_session_state():
-    for key in PLANT_SCOPED_SESSION_KEYS:
-        st.session_state[key] = None if key != "_local_files" else {}
-
-
-def persist_plant_session_state():
-    """Persist plant-scoped pipeline state; validated upload payloads include file content as base64."""
-    if not PLANT_STATE_FILE:
-        return []
-    os.makedirs(os.path.dirname(PLANT_STATE_FILE), exist_ok=True)
-    payload = {key: st.session_state.get(key) for key in PLANT_SCOPED_SESSION_KEYS}
-    with open(PLANT_STATE_FILE, "wb") as f:
-        pickle.dump(payload, f)
-    return [PLANT_STATE_FILE]
-
-
-def load_plant_session_state():
-    reset_plant_scoped_session_state()
-    loaded = []
-    if PLANT_STATE_FILE and os.path.isfile(PLANT_STATE_FILE):
-        try:
-            with open(PLANT_STATE_FILE, "rb") as f:
-                payload = pickle.load(f)
-            for key in PLANT_SCOPED_SESSION_KEYS:
-                if key in payload:
-                    st.session_state[key] = payload[key]
-                    loaded.append(key)
-        except Exception:
-            pass
-    return loaded
-
-
 def persist_current_outputs():
-    """Persist generated output workbooks and plant-scoped session state."""
+    """Persist generated output workbooks on the server for all users."""
     saved = []
     for state_key, path in PERSISTED_FILES.items():
         b64_value = st.session_state.get(state_key)
         if b64_value:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "wb") as f:
                 f.write(b64_to_bytes(b64_value))
             saved.append(path)
-    saved.extend(persist_plant_session_state())
     return saved
 
 
 def load_persisted_outputs_into_session():
-    """Load output workbooks for the selected plant."""
+    """Load server-side outputs into the current user session when available."""
     loaded = []
     for state_key, path in PERSISTED_FILES.items():
         if not st.session_state.get(state_key) and os.path.isfile(path):
@@ -236,79 +125,6 @@ def load_persisted_outputs_into_session():
                 st.session_state[state_key] = bytes_to_b64(f.read())
             loaded.append(state_key)
     return loaded
-
-
-def get_plant_global_config(gp_class):
-    """Return plant-specific global settings, seeded from the app default when absent."""
-    if PLANT_CONFIG_FILE and os.path.isfile(PLANT_CONFIG_FILE):
-        try:
-            with open(PLANT_CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    config = gp_class.get_global_config()
-    save_plant_global_config(config, gp_class=gp_class, apply_to_runtime=False)
-    return config
-
-
-def save_plant_global_config(config, gp_class=None, apply_to_runtime=True):
-    if PLANT_CONFIG_FILE:
-        os.makedirs(os.path.dirname(PLANT_CONFIG_FILE), exist_ok=True)
-        with open(PLANT_CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=2)
-    if apply_to_runtime:
-        gp = gp_class or global_parameter_class()
-        return gp.update_global_config(config)
-    return "Plant configuration saved"
-
-
-def apply_plant_global_config():
-    gp = global_parameter_class()
-    config = get_plant_global_config(gp)
-    gp.update_global_config(config)
-    return config
-
-
-def render_plant_landing_screen():
-    plants = load_plant_registry()
-    st.markdown("""
-    <style>
-    .plant-landing{max-width:760px;margin:4rem auto 1rem auto;padding:2rem;border:1px solid #dbeafe;border-radius:18px;background:#f8fbff;}
-    .plant-title{font-size:34px;font-weight:850;color:#0a192f;margin-bottom:.4rem;}
-    .plant-subtitle{font-size:16px;color:#475569;}
-    </style>
-    <div class="plant-landing"><div class="plant-title">Select plant</div><div class="plant-subtitle">All uploads, output files, dashboards and global settings are linked to the selected plant.</div></div>
-    """, unsafe_allow_html=True)
-    selected = st.selectbox("Plant", plants, index=0, key="plant_landing_select")
-    c1, c2 = st.columns([1, 1])
-    with c1:
-        if st.button("Open selected plant", type="primary", use_container_width=True):
-            st.session_state["active_plant"] = selected
-            configure_active_plant_paths()
-            load_plant_session_state()
-            load_persisted_outputs_into_session()
-            st.rerun()
-    with c2:
-        with st.expander("Add another plant"):
-            new_plant = st.text_input("New plant name", key="new_plant_name")
-            if st.button("Add plant", key="add_plant_btn"):
-                if new_plant.strip():
-                    save_plant_registry(plants + [new_plant.strip()])
-                    st.success(f"Added plant: {new_plant.strip()}")
-                    st.rerun()
-                else:
-                    st.warning("Please enter a plant name.")
-
-
-def render_plant_banner():
-    plant = current_plant()
-    st.markdown(f"""
-    <div style="background:linear-gradient(90deg,#0a192f,#1d4ed8);color:white;padding:18px 24px;border-radius:14px;margin:0 0 18px 0;box-shadow:0 3px 14px rgba(15,23,42,.18);">
-      <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:.78;">Active plant</div>
-      <div style="font-size:30px;font-weight:850;line-height:1.15;">🏭 {plant}</div>
-      <div style="font-size:13px;opacity:.85;margin-top:4px;">All files, outputs, dashboards and global settings are scoped to this plant.</div>
-    </div>
-    """, unsafe_allow_html=True)
 
 
 def first_existing_col(df: pd.DataFrame, candidates):
@@ -598,18 +414,8 @@ def inventory_value_detail_by_material(df: pd.DataFrame):
     return detail_df, diagnostics
 
 
-# ── Plant selection gate ───────────────────────────────────────────────────────
-if "active_plant" not in st.session_state:
-    st.session_state["active_plant"] = None
-
-if not st.session_state["active_plant"]:
-    render_plant_landing_screen()
-    st.stop()
-
-configure_active_plant_paths()
-load_plant_session_state()
+# Load any server-persisted outputs before the sidebar/status is rendered.
 load_persisted_outputs_into_session()
-apply_plant_global_config()
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -618,12 +424,6 @@ with st.sidebar:
         width=140,
     )
     st.title("8 Reasons Inventory")
-    st.markdown(f"**Active plant:** 🏭 `{current_plant()}`")
-    if st.button("Change plant", key="change_plant_btn"):
-        persist_plant_session_state()
-        st.session_state["active_plant"] = None
-        reset_plant_scoped_session_state()
-        st.rerun()
     st.markdown("---")
 
     st.markdown("### Dashboards")
@@ -685,8 +485,6 @@ with st.sidebar:
         st.caption(f"Server output available: {PERSIST_DIR}")
     st.markdown("---")
     st.caption("Goodyear IMS v2 — Streamlit Edition")
-
-render_plant_banner()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HOME
@@ -813,14 +611,12 @@ elif page == "📂 Upload & Validate":
         This option scans the **same folder as `app.py`** for the standard input file names.
         On Streamlit Cloud that is the **root of your GitHub repository**.
 
-        Detected directory: `{APP_DIR}`  
-        Active plant: `{current_plant()}`
+        Detected directory: `{APP_DIR}`
         """)
 
         if st.button("🔍 Scan directory for input files"):
             found = scan_local_files(APP_DIR)
             st.session_state["_local_files"] = found
-            persist_plant_session_state()
 
         if st.session_state.get("_local_files"):
             found = st.session_state["_local_files"]
@@ -845,7 +641,7 @@ elif page == "📂 Upload & Validate":
                 for i, (key, (label, _)) in enumerate(FILE_META.items()):
                     if key not in found:
                         with cols[i % 2]:
-                            f = st.file_uploader(label, type=["xlsx", "xls"], key=f"local_up_{current_plant_slug()}_{key}")
+                            f = st.file_uploader(label, type=["xlsx", "xls"], key=f"local_up_{key}")
                             if f:
                                 file_bytes[key] = f.read()
                                 st.session_state["_local_files"][key] = file_bytes[key]
@@ -864,7 +660,7 @@ elif page == "📂 Upload & Validate":
             "Drop all 12 input files here",
             type=["xlsx", "xls"],
             accept_multiple_files=True,
-            key=f"multi_upload_{current_plant_slug()}",
+            key="multi_upload",
             help="You can select or drop all 12 files in one go."
         )
 
@@ -931,8 +727,7 @@ elif page == "📂 Upload & Validate":
                     st.session_state["validated_data"]    = result
                     st.session_state["intermediate_data"] = None   # reset downstream
                     st.session_state["final_output_b64"]  = None
-                    persist_plant_session_state()
-                    st.success(f"✅ All files validated successfully for {current_plant()}!")
+                    st.success("✅ All files validated successfully!")
                     st.balloons()
                     st.info("👈 Proceed to **Intermediate File** in the sidebar.")
             except Exception as e:
@@ -966,7 +761,6 @@ elif page == "⚙️ Intermediate File":
     if st.button("🔄 Generate Intermediate Output", type="primary"):
         with st.spinner("Calculating… (this may take a minute)"):
             try:
-                apply_plant_global_config()
                 validated_data      = st.session_state["validated_data"]
                 intermediate_output = GenerateIntermediateOutput(validated_data).generate_intermediate_response()
                 response            = IntermediateFile(validated_data).make_response(intermediate_output)
@@ -977,8 +771,7 @@ elif page == "⚙️ Intermediate File":
                     st.session_state["intermediate_data"] = response
                     st.session_state["rm_seg_b64"]        = response.get("RM_Segmentation_Output", "")
                     st.session_state["final_output_b64"]  = None
-                    persist_plant_session_state()
-                    st.success(f"✅ Intermediate file generated for {current_plant()}!")
+                    st.success("✅ Intermediate file generated!")
 
             except Exception as e:
                 import traceback
@@ -1078,7 +871,6 @@ elif page == "📊 Final Output":
     if st.session_state.get("intermediate_data") and st.button("🚀 Run 8 Reasons Calculation", type="primary"):
         with st.spinner("Running 8 Reasons calculation… (may take several minutes for large datasets)"):
             try:
-                apply_plant_global_config()
                 intermediate_input = dict(st.session_state["intermediate_data"])
                 rm_b64 = st.session_state.get("rm_seg_b64", "")
                 if rm_b64:
@@ -1139,9 +931,8 @@ elif page == "🔧 Global Settings":
     st.markdown("Adjust global calculation parameters. Changes apply to the current session.")
 
     gp_class = global_parameter_class()
-    config   = get_plant_global_config(gp_class)
+    config   = gp_class.get_global_config()
     params   = config["global_parameters"][0]
-    st.info(f"These global settings are scoped to plant: **{current_plant()}**")
 
     with st.form("global_settings_form"):
         st.subheader("📈 Forecast Settings")
@@ -1168,30 +959,6 @@ elif page == "🔧 Global Settings":
         st.subheader("💱 Price Conversion")
         usd_value = st.number_input("USD Value (local currency per USD)",
                                      value=params["price_conversion"].get("USD_value", 84), min_value=1)
-
-        st.subheader("📦 RM Segmentation")
-        st.caption("Plant-specific RM segmentation thresholds. Defaults: Variance 1=0–41, 2=41–60, 3=60–100; Segment A=0–80, B=80–96, C=96–100.")
-        rm_seg = params.get("rm_segmentation", {}) or {}
-        def _rm_default(section, band, key, default):
-            item = (rm_seg.get(section, {}) or {}).get(str(band), {})
-            return float(item.get(key, default)) if isinstance(item, dict) else float(default)
-        vc, sc = st.columns(2)
-        with vc:
-            st.markdown("**Variance bands**")
-            v1_min = st.number_input("Variance 1 min", value=_rm_default("variance", "1", "min", 0), min_value=0.0, max_value=100.0, key="rm_v1_min")
-            v1_max = st.number_input("Variance 1 max", value=_rm_default("variance", "1", "max", 41), min_value=0.0, max_value=100.0, key="rm_v1_max")
-            v2_min = st.number_input("Variance 2 min", value=_rm_default("variance", "2", "min", 41), min_value=0.0, max_value=100.0, key="rm_v2_min")
-            v2_max = st.number_input("Variance 2 max", value=_rm_default("variance", "2", "max", 60), min_value=0.0, max_value=100.0, key="rm_v2_max")
-            v3_min = st.number_input("Variance 3 min", value=_rm_default("variance", "3", "min", 60), min_value=0.0, max_value=100.0, key="rm_v3_min")
-            v3_max = st.number_input("Variance 3 max", value=_rm_default("variance", "3", "max", 100), min_value=0.0, max_value=100.0, key="rm_v3_max")
-        with sc:
-            st.markdown("**ABC segment bands**")
-            a_min = st.number_input("Segment A min", value=_rm_default("segment", "A", "min", 0), min_value=0.0, max_value=100.0, key="rm_a_min")
-            a_max = st.number_input("Segment A max", value=_rm_default("segment", "A", "max", 80), min_value=0.0, max_value=100.0, key="rm_a_max")
-            b_min = st.number_input("Segment B min", value=_rm_default("segment", "B", "min", 80), min_value=0.0, max_value=100.0, key="rm_b_min")
-            b_max = st.number_input("Segment B max", value=_rm_default("segment", "B", "max", 96), min_value=0.0, max_value=100.0, key="rm_b_max")
-            c_min = st.number_input("Segment C min", value=_rm_default("segment", "C", "min", 96), min_value=0.0, max_value=100.0, key="rm_c_min")
-            c_max = st.number_input("Segment C max", value=_rm_default("segment", "C", "max", 100), min_value=0.0, max_value=100.0, key="rm_c_max")
 
         st.subheader("🏭 Production Days per Month")
         prod_days    = params.get("production_days", {})
@@ -1226,18 +993,7 @@ elif page == "🔧 Global Settings":
             "cappings":        {"safety_stock_cap": safety_cap, "transit_time_cap": transit_cap, "shipping_interval_cap": shipping_cap, "Maximum Demand in % of Forecast": max_demand_pct},
             "cycle_stock":     {"calculation_methodology": cycle_method},
             "tolerance":       {"local": tol_local, "imported": tol_imported},
-            "rm_segmentation": {
-                "variance": {
-                    "1": {"min": v1_min, "max": v1_max},
-                    "2": {"min": v2_min, "max": v2_max},
-                    "3": {"min": v3_min, "max": v3_max},
-                },
-                "segment": {
-                    "A": {"min": a_min, "max": a_max},
-                    "B": {"min": b_min, "max": b_max},
-                    "C": {"min": c_min, "max": c_max},
-                },
-            },
+            "rm_segmentation": params.get("rm_segmentation", {}),
             "service_level_mapping": params.get("service_level_mapping", {}),
             "production_days": new_prod_days,
             "price_conversion": {"USD_value": usd_value},
@@ -1247,13 +1003,12 @@ elif page == "🔧 Global Settings":
         }]}
         is_valid, msg = gp_class.validate_global_config(new_config)
         if is_valid:
-            runtime_msg = save_plant_global_config(new_config, gp_class=gp_class, apply_to_runtime=True)
-            st.success(f"✅ Plant-specific settings saved for {current_plant()}. {runtime_msg}")
+            st.success(f"✅ {gp_class.update_global_config(new_config)}")
         else:
             st.error(f"❌ Validation errors: {msg}")
 
-    with st.expander("📋 Current plant configuration (raw JSON)"):
-        st.json(get_plant_global_config(gp_class))
+    with st.expander("📋 Current configuration (raw JSON)"):
+        st.json(gp_class.get_global_config())
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DASHBOARD 1  ── RM Segmentation Overview (cards + consumption chart)
@@ -1734,22 +1489,62 @@ elif page == "📈 Dashboard 3":
 
     c1, c2 = st.columns(2)
 
-    # ── R1–R8 average DSI horizontal bar ──────────────────────────────────
+    # ── Avg 8 Reasons DSI waterfall ───────────────────────────────────────
+    # Dashboard 3 aggregate version of the Dashboard 4 waterfall.
+    # Uses official output fields so the total matches the KPI:
+    #   Avg 8 Reasons (DSI) = Avg Cycle (DSI) + Avg Transit (DSI) + Avg Safety (DSI)
     with c1:
-        st.markdown("**Average R1–R8 DSI Contribution**")
-        avgs = [w_avg(fdf3, c) for c in R_COLS]
-        fig1 = go.Figure(go.Bar(
-            y=R_LABELS, x=avgs, orientation="h",
-            marker_color=R_COLORS,
-            text=[f"{v:.2f}" for v in avgs], textposition="outside"
+        st.markdown("**Avg 8 Reasons DSI Waterfall**")
+
+        def w_avg_unrounded(df, col):
+            """Unrounded weighted average, using the same ADS weight as the KPI row."""
+            if df.empty or ads not in df.columns or col not in df.columns:
+                return 0.0
+            values = pd.to_numeric(df[col], errors="coerce").fillna(0)
+            weights = pd.to_numeric(df[ads], errors="coerce").fillna(0)
+            denom = weights.sum()
+            if denom == 0:
+                return float(values.mean()) if len(values) else 0.0
+            return float((values * weights).sum() / denom)
+
+        cycle_avg   = w_avg_unrounded(fdf3, "Cycle (DSI)")
+        transit_avg = w_avg_unrounded(fdf3, "Transit (DSI)")
+        safety_avg  = w_avg_unrounded(fdf3, "Safety (DSI)")
+        total_avg   = w_avg_unrounded(fdf3, "8 Reasons (DSI)")
+
+        wf_labels  = ["Cycle Stock", "Transit Stock", "Safety Stock", "Avg 8 Reasons DSI"]
+        wf_values  = [cycle_avg, transit_avg, safety_avg, total_avg]
+        wf_measure = ["relative", "relative", "relative", "total"]
+
+        fig1 = go.Figure(go.Waterfall(
+            name="DSI",
+            orientation="v",
+            measure=wf_measure,
+            x=wf_labels,
+            y=wf_values,
+            text=[f"{v:.2f}" for v in wf_values],
+            textposition="outside",
+            connector=dict(line=dict(color="#e2e8f0", width=1, dash="dot")),
+            increasing=dict(marker=dict(color="#3b82f6")),
+            decreasing=dict(marker=dict(color="#f59e0b")),
+            totals=dict(marker=dict(color="#0a192f")),
         ))
         fig1.update_layout(
-            margin=dict(l=10,r=60,t=10,b=10), height=320,
-            plot_bgcolor="white", paper_bgcolor="white",
-            xaxis=dict(gridcolor="#e9ecef", title="DSI (days)"),
-            yaxis=dict(tickfont=dict(size=11))
+            margin=dict(l=10, r=10, t=10, b=10),
+            height=320,
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+            yaxis=dict(gridcolor="#e9ecef", title="DSI (days)", rangemode="tozero"),
+            xaxis=dict(tickfont=dict(size=10, family="IBM Plex Mono")),
+            font=dict(family="IBM Plex Sans"),
+            showlegend=False,
         )
         st.plotly_chart(fig1, use_container_width=True)
+        st.caption(
+            "Dashboard 3 waterfall uses the same official output buckets as Dashboard 4, "
+            "aggregated with the Dashboard 3 ADS-weighted average logic: Cycle (DSI) + "
+            "Transit (DSI) + Safety (DSI) = Avg 8 Reasons (DSI)."
+        )
 
     # ── Stacked DSI by INCO term ──────────────────────────────────────────
     with c2:
