@@ -1489,39 +1489,38 @@ elif page == "📈 Dashboard 3":
 
     c1, c2 = st.columns(2)
 
-    # ── Avg 8 Reasons DSI waterfall ───────────────────────────────────────
-    # Dashboard 3 aggregate version of the Dashboard 4 waterfall.
-    # Uses official output fields so the total matches the KPI:
-    #   Avg 8 Reasons (DSI) = Avg Cycle (DSI) + Avg Transit (DSI) + Avg Safety (DSI)
+    # ── R1–R8 average DSI horizontal bar ──────────────────────────────────
     with c1:
+        st.markdown("**Average R1–R8 DSI Contribution**")
+        avgs = [w_avg(fdf3, c) for c in R_COLS]
+        fig1 = go.Figure(go.Bar(
+            y=R_LABELS, x=avgs, orientation="h",
+            marker_color=R_COLORS,
+            text=[f"{v:.2f}" for v in avgs], textposition="outside"
+        ))
+        fig1.update_layout(
+            margin=dict(l=10,r=60,t=10,b=10), height=320,
+            plot_bgcolor="white", paper_bgcolor="white",
+            xaxis=dict(gridcolor="#e9ecef", title="DSI (days)"),
+            yaxis=dict(tickfont=dict(size=11))
+        )
+        st.plotly_chart(fig1, use_container_width=True)
+
+        # ── Avg 8 Reasons DSI waterfall, aligned with Dashboard 4 logic ───
         st.markdown("**Avg 8 Reasons DSI Waterfall**")
 
-        def w_avg_unrounded(df, col):
-            """Unrounded weighted average, using the same ADS weight as the KPI row."""
-            if df.empty or ads not in df.columns or col not in df.columns:
-                return 0.0
-            values = pd.to_numeric(df[col], errors="coerce").fillna(0)
-            weights = pd.to_numeric(df[ads], errors="coerce").fillna(0)
-            denom = weights.sum()
-            if denom == 0:
-                return float(values.mean()) if len(values) else 0.0
-            return float((values * weights).sum() / denom)
-
-        cycle_avg   = w_avg_unrounded(fdf3, "Cycle (DSI)")
-        transit_avg = w_avg_unrounded(fdf3, "Transit (DSI)")
-        safety_avg  = w_avg_unrounded(fdf3, "Safety (DSI)")
-        total_avg   = w_avg_unrounded(fdf3, "8 Reasons (DSI)")
+        cycle_avg   = w_avg(fdf3, "Cycle (DSI)")
+        transit_avg = w_avg(fdf3, "Transit (DSI)")
+        safety_avg  = w_avg(fdf3, "Safety (DSI)")
+        total_avg   = w_avg(fdf3, "8 Reasons (DSI)")
 
         wf_labels  = ["Cycle Stock", "Transit Stock", "Safety Stock", "Avg 8 Reasons DSI"]
         wf_values  = [cycle_avg, transit_avg, safety_avg, total_avg]
         wf_measure = ["relative", "relative", "relative", "total"]
 
-        fig1 = go.Figure(go.Waterfall(
-            name="DSI",
-            orientation="v",
-            measure=wf_measure,
-            x=wf_labels,
-            y=wf_values,
+        fig1_wf = go.Figure(go.Waterfall(
+            name="DSI", orientation="v",
+            measure=wf_measure, x=wf_labels, y=wf_values,
             text=[f"{v:.2f}" for v in wf_values],
             textposition="outside",
             connector=dict(line=dict(color="#e2e8f0", width=1, dash="dot")),
@@ -1529,21 +1528,18 @@ elif page == "📈 Dashboard 3":
             decreasing=dict(marker=dict(color="#f59e0b")),
             totals=dict(marker=dict(color="#0a192f")),
         ))
-        fig1.update_layout(
-            margin=dict(l=10, r=10, t=10, b=10),
-            height=320,
-            plot_bgcolor="white",
-            paper_bgcolor="white",
+        fig1_wf.update_layout(
+            margin=dict(l=10, r=10, t=10, b=10), height=320,
+            plot_bgcolor="white", paper_bgcolor="white",
             yaxis=dict(gridcolor="#e9ecef", title="DSI (days)", rangemode="tozero"),
             xaxis=dict(tickfont=dict(size=10, family="IBM Plex Mono")),
             font=dict(family="IBM Plex Sans"),
             showlegend=False,
         )
-        st.plotly_chart(fig1, use_container_width=True)
+        st.plotly_chart(fig1_wf, use_container_width=True)
         st.caption(
-            "Dashboard 3 waterfall uses the same official output buckets as Dashboard 4, "
-            "aggregated with the Dashboard 3 ADS-weighted average logic: Cycle (DSI) + "
-            "Transit (DSI) + Safety (DSI) = Avg 8 Reasons (DSI)."
+            "Waterfall uses the official output buckets, aggregated with the same Dashboard 3 weighted-average logic: "
+            "Cycle (DSI) + Transit (DSI) + Safety (DSI) = Avg 8 Reasons (DSI)."
         )
 
     # ── Stacked DSI by INCO term ──────────────────────────────────────────
