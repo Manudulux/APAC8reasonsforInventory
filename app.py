@@ -3,6 +3,7 @@ import pandas as pd
 import base64
 import os
 import glob
+import json
 from io import BytesIO
 
 # ── Page config ────────────────────────────────────────────────────────────────
@@ -47,6 +48,43 @@ FILE_META = {
 }
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# ── Plant selector ────────────────────────────────────────────────────────────
+PLANT_REGISTRY_FILE = os.path.join(APP_DIR, "plants.json")
+DEFAULT_PLANTS = ["Aurangabad"]
+
+
+def load_plant_options() -> list:
+    """Load selectable plants for the sidebar plant filter."""
+    if not os.path.isfile(PLANT_REGISTRY_FILE):
+        with open(PLANT_REGISTRY_FILE, "w", encoding="utf-8") as f:
+            json.dump(DEFAULT_PLANTS, f, indent=2)
+        return DEFAULT_PLANTS
+    try:
+        with open(PLANT_REGISTRY_FILE, "r", encoding="utf-8") as f:
+            plants = json.load(f)
+        plants = [str(p).strip() for p in plants if str(p).strip()]
+        return plants or DEFAULT_PLANTS
+    except Exception:
+        return DEFAULT_PLANTS
+
+
+def save_plant_options(plants: list) -> list:
+    """Save selectable plants, keeping Aurangabad as the initial/default plant."""
+    clean = []
+    for plant in plants:
+        plant = str(plant).strip()
+        if plant and plant not in clean:
+            clean.append(plant)
+    if "Aurangabad" not in clean:
+        clean.insert(0, "Aurangabad")
+    with open(PLANT_REGISTRY_FILE, "w", encoding="utf-8") as f:
+        json.dump(clean, f, indent=2)
+    return clean
+
+
+def selected_sidebar_plant() -> str:
+    return st.session_state.get("selected_plant", "Aurangabad")
 
 # ── Server persistence ─────────────────────────────────────────────────────────
 # These files are written on the Streamlit server after an admin runs the final
@@ -424,6 +462,29 @@ with st.sidebar:
         width=140,
     )
     st.title("8 Reasons Inventory")
+
+    # Plant selector shown before dashboard navigation.
+    plant_options = load_plant_options()
+    current_sidebar_plant = st.session_state.get("selected_plant", plant_options[0])
+    plant_index = plant_options.index(current_sidebar_plant) if current_sidebar_plant in plant_options else 0
+    st.selectbox(
+        "🏭 Plant",
+        plant_options,
+        index=plant_index,
+        key="selected_plant",
+        help="Select the plant context to work with. Dashboard data is automatically filtered to this plant when the PLANT column is available.",
+    )
+    with st.expander("➕ Add plant"):
+        new_plant_name = st.text_input("New plant name", key="sidebar_new_plant_name")
+        if st.button("Add plant", key="sidebar_add_plant"):
+            if new_plant_name.strip():
+                save_plant_options(plant_options + [new_plant_name.strip()])
+                st.session_state["selected_plant"] = new_plant_name.strip()
+                st.success(f"Added and selected plant: {new_plant_name.strip()}")
+                st.rerun()
+            else:
+                st.warning("Please enter a plant name.")
+
     st.markdown("---")
 
     st.markdown("### Dashboards")
@@ -486,6 +547,13 @@ with st.sidebar:
     st.markdown("---")
     st.caption("Goodyear IMS v2 — Streamlit Edition")
 
+st.markdown(f"""
+<div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:10px 14px;margin-bottom:14px;">
+    <span style="font-size:12px;font-weight:700;color:#3730a3;text-transform:uppercase;letter-spacing:.06em;">Selected plant</span><br>
+    <span style="font-size:22px;font-weight:800;color:#0f172a;">🏭 {selected_sidebar_plant()}</span>
+</div>
+""", unsafe_allow_html=True)
+
 # ══════════════════════════════════════════════════════════════════════════════
 # HOME
 # ══════════════════════════════════════════════════════════════════════════════
@@ -533,6 +601,10 @@ def render_shared_filters(sku_df):
     st.markdown("</div>", unsafe_allow_html=True)
 
     fdf = sku_df.copy()
+    sidebar_plant = selected_sidebar_plant()
+    if sidebar_plant and "PLANT" in fdf.columns:
+        fdf = fdf[fdf["PLANT"].astype(str) == str(sidebar_plant)]
+        st.caption(f"Sidebar plant filter applied: {sidebar_plant}")
     if f_country != "All": fdf = fdf[fdf["Region"]          == f_country]
     if f_rm_seg  != "All": fdf = fdf[fdf["RM Segmentation"] == f_rm_seg]
     if f_inco    != "All": fdf = fdf[fdf["INCO Term"]        == f_inco]
@@ -1716,6 +1788,13 @@ elif page == "🔬 Dashboard 4":
 
     fo_bytes = b64_to_bytes(st.session_state["final_output_b64"])
     sku_df   = pd.read_excel(BytesIO(fo_bytes), sheet_name="SKU Level")
+    sidebar_plant = selected_sidebar_plant()
+    if sidebar_plant and "PLANT" in sku_df.columns:
+        sku_df = sku_df[sku_df["PLANT"].astype(str) == str(sidebar_plant)]
+        st.caption(f"Sidebar plant filter applied: {sidebar_plant}")
+        if sku_df.empty:
+            st.warning(f"No SKU data found for selected plant: {sidebar_plant}")
+            st.stop()
 
     # ── Material selector ─────────────────────────────────────────────────────
     st.markdown("<div class='d4-hero'>🔬 Material Deep Dive</div>", unsafe_allow_html=True)
